@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Merora · hlas Meri</title>
+<style>
+  :root { --card: #10101a; --line: #18181d; --text2: #aaaaaa; --blue: #5680f5; --orange: #ff8a6a; --orange-bg: #2a1f1a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif; line-height: 1.45; }
+  main { max-width: 760px; margin: 0 auto; padding: 40px 20px 64px; }
+  h1 { margin: 0 0 8px; font-size: 36px; font-weight: 800; letter-spacing: -.5px; }
+  p { margin: 0 0 16px; color: var(--text2); font-size: 16px; }
+  ol { margin: 0 0 16px; padding-left: 22px; color: #e6e6f0; }
+  li { margin-bottom: 8px; }
+  code { background: var(--card); padding: 2px 6px; border-radius: 6px; font-size: 14px; color: #fff; }
+  a { color: #8da9f8; }
+  #status { min-height: 24px; margin: 0 0 20px; color: #fff; font-weight: 500; }
+  #status.error { color: var(--orange); }
+  ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .voice { background: var(--card); border: 2px solid transparent; border-radius: 20px; padding: 14px 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+  .voice.selected { border-color: var(--orange); background: var(--orange-bg); }
+  .info { flex: 1 1 200px; min-width: 0; }
+  .name { font-size: 18px; font-weight: 600; }
+  .description { font-size: 14px; color: var(--text2); }
+  audio { flex: 1 1 240px; min-width: 0; height: 36px; }
+  button { flex: none; min-height: 44px; padding: 0 18px; border: 0; border-radius: 22px; background: var(--blue); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  .selected button { background: var(--orange); color: #000; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Hlas Meri</h1>
+  <p id="welcome">Načítám…</p>
+  <p id="status" role="status" aria-live="polite"></p>
+  <ul id="list"></ul>
+</main>
+<script type="module">
+const welcome = document.getElementById('welcome');
+const statusEl = document.getElementById('status');
+const list = document.getElementById('list');
+
+const setStatus = (text, error = false) => {
+  statusEl.textContent = text;
+  statusEl.classList.toggle('error', error);
+};
+
+function showMissingKey() {
+  welcome.innerHTML = `Zatím tu není klíč k ElevenLabs. Až ho doplníš, načti tuhle stránku znovu.
+    <ol>
+      <li>Na <a href="https://elevenlabs.io/pricing" target="_blank" rel="noreferrer">elevenlabs.io</a> si založ účet s plánem Starter. Komerční licenci uvádí až on, ne plán zdarma.</li>
+      <li>V nastavení účtu vytvoř API klíč s právy na Text to Speech a Voices.</li>
+      <li>Vlož ho do souboru <code>.env</code> v repu meri za <code>ELEVENLABS_API_KEY=</code> a ulož.</li>
+    </ol>`;
+}
+
+function render(voiceList, selected, mine) {
+  list.replaceChildren(...voiceList.map((h) => {
+    const order = mine.findIndex((m) => m.voice_id === h.voice_id) + 1;
+    const li = document.createElement('li');
+    li.className = 'voice' + (h.voice_id === selected ? ' selected' : '');
+    li.dataset.id = h.voice_id;
+
+    const info = document.createElement('div');
+    info.className = 'info';
+    const name = document.createElement('div');
+    name.className = 'name';
+    name.textContent = order ? `${order} · ${h.name}` : h.name;
+    const description = document.createElement('div');
+    description.className = 'description';
+    description.textContent = h.description;
+    info.append(name, description);
+
+    const audio = document.createElement('audio');
+    audio.controls = true;
+    audio.preload = 'none';
+    audio.src = h.sample;
+    audio.setAttribute('aria-label', `Ukázka hlasu ${h.name}`);
+    audio.addEventListener('play', () => {
+      for (const other of document.querySelectorAll('audio')) if (other !== audio) other.pause();
+    });
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = h.voice_id === selected ? 'Spustit znovu' : order ? 'Přepnout' : 'Přidat';
+    button.setAttribute('aria-label', `${button.textContent}: hlas ${h.name}`);
+    button.addEventListener('click', () => (order ? switchToVoice(h, order) : addVoiceFromList(h)));
+
+    li.append(info, audio, button);
+    return li;
+  }));
+}
+
+// Už namluvený hlas se přepne hned a nic to nestojí.
+async function switchToVoice(h, order) {
+  await fetch('/cmd', { method: 'POST', body: JSON.stringify({ cmd: 'voice', order }) });
+  setStatus(`V okně teď mluví ${h.name}.`);
+  await load();
+}
+
+async function addVoiceFromList(h) {
+  const buttons = document.querySelectorAll('button');
+  buttons.forEach((b) => { b.disabled = true; });
+  setStatus(`Namlouvám všechny věty hlasem ${h.name}. Trvá to asi půl minuty.`);
+  try {
+    const res = await fetch('/api/voice', {
+      method: 'POST',
+      body: JSON.stringify({ voice_id: h.voice_id, public_owner_id: h.public_owner_id, name: h.name }),
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error ?? `Chyba ${res.status}`);
+    setStatus(`Hotovo, ${h.name} má ${result.duration.toFixed(1)} s řeči a je na klávese ${result.order}. V okně už mluví.`);
+    await load();
+  } catch (err) {
+    setStatus(err.message, true);
+  } finally {
+    document.querySelectorAll('button').forEach((b) => { b.disabled = false; });
+  }
+}
+
+async function load() {
+  const res = await fetch('/api/voices');
+  const data = await res.json();
+  if (!data.hasKey) return showMissingKey();
+  if (data.error) {
+    welcome.textContent = 'Seznam hlasů se nepodařilo načíst.';
+    return setStatus(data.error, true);
+  }
+  if (!data.voiceList.length) {
+    welcome.textContent = 'ElevenLabs teď nevrátil žádný český ženský hlas.';
+    return;
+  }
+  welcome.textContent = 'Ukázky jsou zdarma a jsou to obecné věty od autorů hlasů. Když klikneš na Přidat, Meri tím hlasem namluví všechny své věty, utratí to pár set kreditů a hlas dostane další číslo. Přepnout na něj jde tady na stránce.';
+  render(data.voiceList, data.selected, data.mine);
+}
+
+load().catch((err) => {
+  welcome.textContent = '';
+  setStatus(err.message, true);
+});
+</script>
+</body>
+</html>

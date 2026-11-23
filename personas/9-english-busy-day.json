@@ -1,0 +1,61 @@
+{
+  "id": "english-busy",
+  "title": "English, busy morning",
+  "description": "Language English: the whole brief and the conversation in English. Dentist at half past ten, team meeting from the calendar, a repeating workout in the evening, a shopping list without a time (not on screen, not spoken) and one urgent mail.",
+  "now": "2026-11-24T08:10",
+  "settings": {
+    "language": "en",
+    "salutation": "Mark",
+    "gender": "male",
+    "briefLength": "normal"
+  },
+  "sources": {
+    "merora": [
+      { "id": 901, "text": "Dentist", "when": "2026-11-24T10:30" },
+      { "id": 902, "text": "Call mum", "when": "2026-11-24T17:00" },
+      { "id": 903, "text": "Workout", "when": "2026-11-24T19:00", "repeat": "daily" },
+      { "id": 904, "text": "Shopping list", "list": ["Milk", "Eggs"] },
+      { "id": 905, "text": "Renew passport", "when": "2026-11-26T09:00" }
+    ],
+    "calendar": [
+      { "title": "Team meeting", "time": "14:00" }
+    ],
+    "calendarAhead": [
+      { "day": "2026-11-25", "title": "Flight to Lisbon", "time": "07:15" }
+    ],
+    "weather": {
+      "temperature": 6,
+      "description": "overcast",
+      "lowest": 3,
+      "highest": 9,
+      "precipitation_chance": 20,
+      "tomorrow": { "description": "rain", "lowest": 4, "highest": 8, "precipitation_chance": 80 }
+    },
+    "gmail": {
+      "count": 2,
+      "more": false,
+      "mails": [
+        { "subject": "Your parcel arrives today", "from": "DPD", "about": "The parcel will be delivered today between 12 and 14.", "when": "2026-11-24T07:20", "kind": "notification", "important": true, "urgent": true, "tester": false },
+        { "subject": "Weekend sale", "from": "Zara", "about": "Discounts on clothes.", "when": "2026-11-24T06:00", "kind": "news", "important": false, "urgent": false, "tester": false }
+      ]
+    }
+  },
+  "expected": {
+    "greeting": "Good morning, Mark",
+    "mention": [
+      { "what": "dentist", "words": ["dentist"] },
+      { "what": "team meeting", "words": ["meeting"] }
+    ],
+    "notMention": ["milk", "eggs", "zubař", "dobré"],
+    "inBox": ["r901", "r902", "r903"],
+    "notInBox": ["r904", "r905"]
+  },
+  "conversation": [
+    { "say": "Move the dentist to eleven.", "action": ["move"], "id": "r901" },
+    { "say": "Remind me tomorrow at nine to call the bank.", "action": ["create"] },
+    { "say": "Add bread to the shopping list.", "action": ["add_to_list"] },
+    { "say": "What's on tomorrow?", "action": ["info"], "answerMentions": ["lisbon", "flight"] },
+    { "say": "Delete the workout.", "action": ["delete"], "id": "r903" },
+    { "say": "What's in the news today?", "action": ["unsupported"] }
+  ]
+}

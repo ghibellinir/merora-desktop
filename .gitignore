@@ -1,0 +1,16 @@
+node_modules/
+.DS_Store
+.env
+.env.*
+!.env.example
+# Hlas se dá kdykoli vyrobit znovu: npm run voice
+public/audio/
+# Tvoje připomínky a kalendář
+data/brief.json
+data/brief.json.new
+data/brief.json.update
+data/brief-tomorrow.json
+data/brief-tomorrow.json.new
+# Vlastní doplňky (zdroje navíc, docs/addons.md) a osobní poznámky pro Clauda
+dev/
+CLAUDE.local.md

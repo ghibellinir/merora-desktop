@@ -1,0 +1,158 @@
+{
+  "id": "studentka",
+  "title": "Studentka bez Merory",
+  "description": "Jen kalendář, počasí a Gmail, ráno před školou. V kalendáři má zapsané narozeniny kamarádky, mail ze školy spěchá.",
+  "now": "2026-11-24T07:30",
+  "settings": {
+    "salutation": "Báro",
+    "gender": "female",
+    "briefLength": "normal"
+  },
+  "sources": {
+    "calendar": [
+      {
+        "title": "Narozeniny Káji",
+        "time": null
+      },
+      {
+        "title": "Přednáška z ekonomie",
+        "time": "9:10"
+      },
+      {
+        "title": "Cvičení z matiky",
+        "time": "12:30"
+      },
+      {
+        "title": "Kafe s Tomem",
+        "time": "17:00"
+      }
+    ],
+    "weather": {
+      "temperature": 4,
+      "description": "déšť",
+      "lowest": 2,
+      "highest": 7,
+      "precipitation_chance": 85,
+      "tomorrow": {
+        "description": "polojasno",
+        "lowest": 1,
+        "highest": 6,
+        "precipitation_chance": 10
+      }
+    },
+    "gmail": {
+      "count": 3,
+      "more": false,
+      "mails": [
+        {
+          "subject": "Odevzdání seminární práce",
+          "from": "Univerzita Karlova",
+          "about": "Seminární práci je potřeba odevzdat do zítřejšího poledne.",
+          "when": "2026-11-23T18:40",
+          "kind": "notification",
+          "important": true,
+          "urgent": true,
+          "tester": false
+        },
+        {
+          "subject": "Black Friday slevy až 70 %",
+          "from": "Zalando",
+          "about": "Slevy na oblečení.",
+          "when": "2026-11-24T06:10",
+          "kind": "news",
+          "important": false,
+          "urgent": false,
+          "tester": false
+        },
+        {
+          "subject": "Kolejní večírek v pátek",
+          "from": "Kolejní rada",
+          "about": "Pozvánka na páteční večírek.",
+          "when": "2026-11-23T21:00",
+          "kind": "notification",
+          "important": false,
+          "urgent": false,
+          "tester": false
+        }
+      ]
+    },
+    "calendarAhead": [
+      {
+        "day": "2026-11-25",
+        "title": "Zkouška z účetnictví",
+        "time": "9:00"
+      }
+    ]
+  },
+  "expected": {
+    "greeting": "Dobré ráno, Báro",
+    "mention": [
+      {
+        "what": "narozeniny Káji (celodenní, zapsala si je)",
+        "words": [
+          "Káj",
+          "narozenin"
+        ]
+      },
+      {
+        "what": "přednáška",
+        "words": [
+          "přednáš",
+          "ekonomi"
+        ]
+      },
+      {
+        "what": "seminární práce, spěchá",
+        "words": [
+          "seminár",
+          "odevzd"
+        ]
+      }
+    ],
+    "notMention": [
+      "Merora",
+      "připomín",
+      "Zalando",
+      "Black Friday",
+      "chtěl jsi",
+      "měl jsi",
+      "naplánoval jsi"
+    ]
+  },
+  "conversation": [
+    {
+      "say": "Jaké bude zítra počasí?",
+      "action": [
+        "info"
+      ]
+    },
+    {
+      "say": "Co mám dneska odpoledne?",
+      "action": [
+        "info"
+      ]
+    },
+    {
+      "say": "Napiš Tomovi mail, že přijdu později.",
+      "action": [
+        "unsupported"
+      ]
+    },
+    {
+      "say": "Jaké bude počasí o víkendu?",
+      "action": [
+        "unsupported"
+      ]
+    },
+    {
+      "say": "Co mě čeká zítra?",
+      "action": [
+        "info"
+      ],
+      "answerMentions": [
+        "účetnictv",
+        "zkoušk"
+      ]
+    }
+  ]
+}

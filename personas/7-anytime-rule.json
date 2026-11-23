@@ -1,0 +1,87 @@
+{
+  "id": "kdykoli",
+  "title": "Kdykoli na vlastní pravidlo",
+  "description": "Rutina Cvičení je v Kdykoli a vlastní pravidlo chce, ať je vidět každý den. Kniha je taky v Kdykoli, ale pravidlo o ní nemluví, takže vidět být nemá. Prázdný seznam Přání vidět být nemá nikdy. Na dnešek má v deset zubaře.",
+  "now": "2026-11-25T07:30",
+  "settings": {
+    "salutation": "Riki",
+    "gender": "male",
+    "briefLength": "normal"
+  },
+  "sources": {
+    "merora": [
+      {
+        "id": 701,
+        "text": "Zubař",
+        "when": "2026-11-25T10:00"
+      },
+      {
+        "id": 702,
+        "text": "Cvičení",
+        "routine": [
+          "Protažení",
+          "Kliky",
+          "Dřepy"
+        ]
+      },
+      {
+        "id": 703,
+        "text": "Přečíst knihu"
+      },
+      {
+        "id": 704,
+        "text": "Přání",
+        "list": []
+      }
+    ],
+    "calendar": [],
+    "weather": {
+      "temperature": 5,
+      "description": "polojasno",
+      "lowest": 2,
+      "highest": 8,
+      "precipitation_chance": 10
+    },
+    "gmail": {
+      "count": 0,
+      "more": false,
+      "mails": []
+    }
+  },
+  "expected": {
+    "greeting": "Dobré ráno, Riki",
+    "mention": [
+      {
+        "what": "zubař v deset",
+        "words": [
+          "zubař",
+          "zubaře"
+        ]
+      }
+    ],
+    "notMention": [
+      "knih",
+      "prani",
+      "cvic"
+    ],
+    "inBox": [
+      "r701",
+      "r702"
+    ],
+    "notInBox": [
+      "r703",
+      "r704"
+    ]
+  },
+  "conversation": [
+    {
+      "say": "Co mám v Kdykoli?",
+      "action": [
+        "info"
+      ]
+    }
+  ],
+  "rules": [
+    "Cvičení mi zobrazuj každý den, i když ho mám v Kdykoli."
+  ]
+}

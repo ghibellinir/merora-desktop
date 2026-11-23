@@ -1,0 +1,92 @@
+{
+  "id": "vecer",
+  "title": "Večer, počet zazvonění zapnutý",
+  "description": "Shrnutí si pouští ve čtvrt na deset večer. Ráno nestihl zavolat do banky (zvonilo pětkrát), ještě má pověsit prádlo. Počet zazvonění má zapnutý. Má zapnuté i včerejší nedodělané, takže dárek pro mámu ze včerejška má být v boxu (ale Meri o něm nemluví).",
+  "now": "2026-11-24T21:15",
+  "settings": {
+    "salutation": "Martine",
+    "gender": "male",
+    "briefLength": "normal",
+    "mentionRings": true,
+    "showYesterday": true
+  },
+  "sources": {
+    "merora": [
+      {
+        "id": 301,
+        "text": "Zavolat do banky",
+        "when": "2026-11-24T10:00",
+        "rang": 5
+      },
+      {
+        "id": 302,
+        "text": "Pověsit prádlo",
+        "when": "2026-11-24T22:00"
+      },
+      {
+        "id": 303,
+        "text": "Koupit dárek pro mámu",
+        "when": "2026-11-23T17:00",
+        "rang": 2
+      }
+    ],
+    "calendar": [
+      {
+        "title": "Fotbal v televizi",
+        "time": "20:45"
+      }
+    ],
+    "weather": {
+      "temperature": 2,
+      "description": "jasno",
+      "lowest": -1,
+      "highest": 6,
+      "precipitation_chance": 0
+    }
+  },
+  "expected": {
+    "greeting": "Dobrý večer, Martine",
+    "mention": [
+      {
+        "what": "banka, ještě nehotová",
+        "words": [
+          "bank"
+        ]
+      },
+      {
+        "what": "prádlo",
+        "words": [
+          "prádl"
+        ]
+      }
+    ],
+    "notMention": [
+      "dárek",
+      "mámu"
+    ],
+    "inBox": [
+      "r303"
+    ]
+  },
+  "conversation": [
+    {
+      "say": "Co jsem dneska nestihl?",
+      "action": [
+        "info"
+      ]
+    },
+    {
+      "say": "Připomeň mi zítra v osm zavolat do banky.",
+      "action": [
+        "create"
+      ]
+    },
+    {
+      "say": "Do banky jsem nakonec zavolal, odškrtni to.",
+      "action": [
+        "complete"
+      ],
+      "id": "r301"
+    }
+  ]
+}

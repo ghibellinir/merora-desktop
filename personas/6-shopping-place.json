@@ -1,0 +1,97 @@
+{
+  "id": "shopping",
+  "title": "Nákup s místem, bez počasí",
+  "description": "Na šestou má „Nakoupit“, nákupní seznam má jen na místo (obchod), ten do boxu ani do řeči nepatří (Riccardo 23. 11.: jen s časem). Na čtvrtou má vyzvednout balík na poště (místo i čas). Prázdný seznam Vánoce nemá být vidět. O počasí mluvit nechce.",
+  "now": "2026-11-24T09:00",
+  "settings": {
+    "salutation": "Petro",
+    "gender": "female",
+    "briefLength": "normal",
+    "mentionWeather": false
+  },
+  "sources": {
+    "merora": [
+      {
+        "id": 501,
+        "text": "Nakoupit",
+        "when": "2026-11-24T18:00"
+      },
+      {
+        "id": 502,
+        "text": "Nákupní seznam",
+        "place": "Albert",
+        "list": [
+          "Mléko",
+          "Chleba",
+          "Jogurty"
+        ]
+      },
+      {
+        "id": 503,
+        "text": "Vánoce",
+        "list": []
+      },
+      {
+        "id": 504,
+        "text": "Vyzvednout balík",
+        "when": "2026-11-24T16:00",
+        "place": "Pošta"
+      }
+    ],
+    "weather": {
+      "temperature": 5,
+      "description": "zataženo",
+      "lowest": 2,
+      "highest": 7,
+      "precipitation_chance": 30
+    }
+  },
+  "expected": {
+    "greeting": "Dobré ráno, Petro",
+    "mention": [
+      {
+        "what": "nakoupit v šest",
+        "words": [
+          "nakoup",
+          "nákup"
+        ]
+      },
+      {
+        "what": "balík na poště",
+        "words": [
+          "balík"
+        ]
+      }
+    ],
+    "notMention": [
+      "Vánoce",
+      "stupň",
+      "Albert",
+      "mléko",
+      "seznam"
+    ],
+    "inBox": [
+      "r501",
+      "r504"
+    ],
+    "notInBox": [
+      "r503",
+      "r502"
+    ]
+  },
+  "conversation": [
+    {
+      "say": "Co mám v nákupním seznamu?",
+      "action": [
+        "info"
+      ]
+    },
+    {
+      "say": "Jaké bude zítra počasí?",
+      "action": [
+        "info",
+        "unsupported"
+      ]
+    }
+  ]
+}

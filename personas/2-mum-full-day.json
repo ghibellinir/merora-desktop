@@ -1,0 +1,164 @@
+{
+  "id": "mama",
+  "title": "Máma s plným dnem",
+  "description": "Víc dnešních připomínek, než se vejde do boxu, k tomu seznam, rutina a věc po termínu ze včerejška. Buzení dětí už proběhlo a hotové není. Počet zazvonění má vypnutý.",
+  "now": "2026-11-24T06:50",
+  "settings": {
+    "salutation": "Jano",
+    "gender": "female",
+    "briefLength": "normal",
+    "mentionRings": false
+  },
+  "sources": {
+    "merora": [
+      {
+        "id": 101,
+        "text": "Vzbudit děti",
+        "when": "2026-11-24T06:30",
+        "rang": 3
+      },
+      {
+        "id": 102,
+        "text": "Odvézt Aničku do školky",
+        "when": "2026-11-24T07:40"
+      },
+      {
+        "id": 103,
+        "text": "Porada v práci",
+        "when": "2026-11-24T09:00"
+      },
+      {
+        "id": 104,
+        "text": "Zubař s Matějem",
+        "when": "2026-11-24T14:00"
+      },
+      {
+        "id": 105,
+        "text": "Vyzvednout Aničku",
+        "when": "2026-11-24T16:30"
+      },
+      {
+        "id": 106,
+        "text": "Plavání Matěj",
+        "when": "2026-11-24T17:15"
+      },
+      {
+        "id": 107,
+        "text": "Uvařit večeři",
+        "when": "2026-11-24T18:30"
+      },
+      {
+        "id": 108,
+        "text": "Zaplatit školné",
+        "when": "2026-11-23T10:00",
+        "rang": 4
+      },
+      {
+        "id": 109,
+        "text": "Nákup",
+        "list": [
+          "Mléko",
+          "Chleba",
+          "Banány"
+        ]
+      },
+      {
+        "id": 110,
+        "text": "Cvičení",
+        "routine": [
+          "Protažení",
+          "Dřepy"
+        ]
+      }
+    ],
+    "calendar": [
+      {
+        "title": "Svátek Ivany",
+        "time": null
+      },
+      {
+        "title": "Porada v práci",
+        "time": "9:00"
+      },
+      {
+        "title": "Rodičovské sdružení",
+        "time": "19:00"
+      }
+    ],
+    "weather": {
+      "temperature": 3,
+      "description": "zataženo",
+      "lowest": 1,
+      "highest": 6,
+      "precipitation_chance": 20
+    }
+  },
+  "expected": {
+    "greeting": "Dobré ráno, Jano",
+    "mention": [
+      {
+        "what": "buzení dětí, ještě není hotové",
+        "words": [
+          "vzbud",
+          "buzen",
+          "děti"
+        ]
+      },
+      {
+        "what": "svátek Ivany (celodenní, zapsala si ho)",
+        "words": [
+          "Ivan"
+        ]
+      }
+    ],
+    "notMention": [
+      "mléko",
+      "banán",
+      "školné",
+      "chtěl jsi",
+      "měl jsi"
+    ],
+    "notInBox": [
+      "r108",
+      "r109",
+      "r110"
+    ],
+    "everyPage": true
+  },
+  "conversation": [
+    {
+      "say": "Odškrtni zubaře, už jsme tam byli.",
+      "action": [
+        "complete"
+      ],
+      "id": "r104"
+    },
+    {
+      "say": "Děti už jsou vzhůru, to buzení je hotové.",
+      "action": [
+        "complete"
+      ],
+      "id": "r101"
+    },
+    {
+      "say": "Odškrtni celý nákup.",
+      "action": [
+        "unsupported",
+        "unclear"
+      ]
+    },
+    {
+      "say": "Smaž toho zubaře.",
+      "action": [
+        "delete"
+      ],
+      "id": "r104"
+    },
+    {
+      "say": "Přidej do nákupu jogurty.",
+      "action": [
+        "add_to_list"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "id": "english-evening",
+  "title": "English, evening, short brief",
+  "description": "Language English, a woman, short brief in the evening. Paying the rent at three is past and not done (say it plainly, no nagging), taking out the bins at nine is still ahead. Nothing in the calendar.",
+  "now": "2026-11-24T19:30",
+  "settings": {
+    "language": "en",
+    "salutation": "Anna",
+    "gender": "female",
+    "briefLength": "short"
+  },
+  "sources": {
+    "merora": [
+      { "id": 1001, "text": "Pay the rent", "when": "2026-11-24T15:00", "rang": 2 },
+      { "id": 1002, "text": "Take out the bins", "when": "2026-11-24T21:00" }
+    ],
+    "calendar": [],
+    "weather": {
+      "temperature": 2,
+      "description": "clear",
+      "lowest": -1,
+      "highest": 5,
+      "precipitation_chance": 0,
+      "tomorrow": { "description": "partly cloudy", "lowest": 0, "highest": 6, "precipitation_chance": 10 }
+    }
+  },
+  "expected": {
+    "greeting": "Good evening, Anna",
+    "maxSentences": 4,
+    "mention": [
+      { "what": "the bins at nine", "words": ["bin"] },
+      { "what": "the rent, not done yet", "words": ["rent"] }
+    ],
+    "notMention": ["don't forget", "make sure", "rang", "twice"],
+    "inBox": ["r1001", "r1002"]
+  },
+  "conversation": [
+    { "say": "I've paid the rent.", "action": ["complete"], "id": "r1001" },
+    { "say": "What's the weather like tomorrow?", "action": ["info"] },
+    { "say": "Send my landlord an email.", "action": ["unsupported"] },
+    { "say": "That's all, good night.", "action": ["end"] }
+  ]
+}

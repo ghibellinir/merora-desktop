@@ -1,0 +1,373 @@
+/* Barvy a tvary podle design systému Merory (artboard „Meri – obrazovky“). */
+:root {
+  --card: #10101a;
+  --fired: #ff8a6a;
+  --fired-tile: #2a1f1a;
+  --tile: #1a2332;
+  --ico: #6b91e8;
+  --line: #18181d;
+  --ink-card: #d0d0d5;
+  --ink-2: #aaaaaa;
+  --control: #0d0d10;
+  --bubble: #0b112a;
+  --bubble-line: #3b55c4;
+  --bubble-ink: #e6e6f0;
+  --edge: #2f2f3a;
+}
+
+html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+body {
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+body.no-cursor { cursor: none; }
+[hidden] { display: none !important; }
+
+/* Plátno 1600 × 1000, zmenšené na velikost okna (prizpusob v meri.js). */
+#stage { position: absolute; left: 0; top: 0; overflow: hidden; background: #000; transform-origin: 0 0; }
+
+/* Který hlas právě zní. Jen krátce po přepnutí klávesou 1–9. */
+.voice-label {
+  position: fixed; top: 2.5vw; left: 2.5vw; z-index: 10;
+  padding: .4em .9em; border-radius: 1em;
+  background: var(--card); border: 2px solid var(--bubble-line);
+  font-size: 3vw; font-weight: 700;
+  pointer-events: none;
+}
+
+/* Neuron */
+.mn-art { position: absolute; inset: -11.8%; transform-origin: 50% 50%; will-change: transform; }
+.mn-art img { position: absolute; display: block; }
+
+/* Společné. Průhlednost .002 místo nuly: prohlížeč prvek vykreslí předem (viz NEVIDITELNE v meri.js)
+   a rozhraní při načítání stránky neprobliká. */
+.r { opacity: .002; will-change: opacity, transform; }
+.cd {
+  box-sizing: border-box;
+  border: 3px solid transparent;
+  background-color: var(--card);
+  transition: background-color .26s ease, border-color .26s ease, transform .26s ease, opacity .26s ease;
+}
+.cd.on { background-color: var(--fired-tile); border-color: var(--fired); }
+.cd.dim { opacity: .5; }
+
+.tile { flex: none; display: flex; align-items: center; justify-content: center; }
+.tile.fired { background: var(--fired-tile); color: var(--fired); }
+.tile.blue { background: var(--tile); color: var(--ico); }
+.tile svg { display: block; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Rozložení: Meri vlevo, vpravo jen boxy zapnutých zdrojů. Box, který chybí, uvolní místo:
+   bez dlaždic je víc místa na řádky, bez „Dnes“ se panely roztáhnou. */
+.app { position: absolute; inset: 0; box-sizing: border-box; display: grid; grid-template-columns: 480px minmax(0, 1fr); column-gap: 52px; padding: 44px 52px; }
+.app-left { display: flex; flex-direction: column; align-items: center; gap: 36px; min-width: 0; padding-top: 40px; }
+.app-neuron { position: relative; flex: none; width: 380px; height: 380px; opacity: .002; }
+.app-right { display: flex; flex-direction: column; gap: 20px; min-width: 0; min-height: 0; }
+.app-head { flex: none; height: 92px; display: flex; align-items: center; gap: 24px; padding: 0 6px; }
+.app-head .greeting { flex: 1; min-width: 0; }
+.app-head h1 { margin: 0; font-size: 52px; line-height: 60px; font-weight: 800; letter-spacing: -1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.app-head .date { font-size: 24px; line-height: 30px; color: var(--ink-2); white-space: nowrap; }
+/* Přepínač Dnes / Zítra v hlavičce vedle data, ať pozdrav zůstane celý. */
+.app-head .date-row { display: flex; align-items: center; gap: 16px; }
+.day-switch { flex: none; display: flex; gap: 2px; padding: 2px; border-radius: 16px; background: var(--card); border: 1px solid #23232e; }
+.day-switch[hidden] { display: none; }
+.day-switch button {
+  padding: 1px 16px; border: 0; border-radius: 14px; background: none; color: var(--ink-2);
+  font: inherit; font-size: 19px; line-height: 24px; font-weight: 600; cursor: pointer; transition: background .2s ease, color .2s ease;
+}
+.day-switch button:hover { color: #fff; }
+.day-switch button[aria-pressed="true"] { background: var(--tile); color: #fff; }
+.day-switch button:focus-visible { outline: 2px solid var(--bubble-line); outline-offset: 2px; }
+.app-head .clock { font-size: 52px; line-height: 60px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.app-tiles { flex: none; display: grid; gap: 20px; }
+.app-body { flex: 1; min-height: 0; display: flex; gap: 20px; }
+.app-today { flex: 1.25; min-width: 0; min-height: 0; display: grid; grid-template-rows: repeat(6, minmax(0, 1fr)); gap: 12px; }
+.app-today .empty { grid-row: 1 / -1; align-self: center; margin: 0; font-size: 28px; color: var(--ink-2); text-align: center; }
+/* Stránky v boxu „Dnes“ (víc než 6 řádků): řádky jiných stránek schované, pod nimi puntíky. */
+.app-today > .r[hidden] { display: none !important; }
+.app-today .pages { grid-row: 7; display: flex; justify-content: center; gap: 4px; }
+.app-today .pages .dot { width: 30px; height: 22px; padding: 0; border: 0; background: none; cursor: pointer; display: grid; place-items: center; }
+.app-today .pages .dot::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--edge); transition: background .2s, transform .2s; }
+.app-today .pages .dot[aria-current="true"]::before { background: var(--ico); transform: scale(1.25); }
+.app-today .pages .dot:focus-visible { outline: 2px solid var(--bubble-line); outline-offset: 2px; border-radius: 6px; }
+.app-today.turn > .r[data-page]:not([hidden]) { animation: page-turn .28s ease-out; }
+@keyframes page-turn { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+.app-panels { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 20px; }
+.app-panels.wide { flex-direction: row; }
+
+/* Počasí v hlavičce */
+.chip { height: 68px; padding: 0 26px; border-radius: 34px; display: flex; align-items: center; gap: 12px; }
+.chip.on { transform: scale(1.08); }
+.chip svg { flex: none; fill: none; stroke: var(--ico); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.chip .temperature { font-size: 40px; line-height: 48px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.chip .precipitation { font-size: 24px; line-height: 30px; font-weight: 600; white-space: nowrap; }
+
+/* Řádek v „Dnes“ */
+.line { height: 100%; padding: 0 22px; border-radius: 24px; display: flex; align-items: center; gap: 18px; }
+.line.on { transform: scale(1.03); }
+.line .tile { width: 52px; height: 52px; border-radius: 15px; }
+.line .text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.line .title { font-size: 30px; line-height: 36px; font-weight: 600; letter-spacing: -.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.line .meta { font-size: 21px; line-height: 26px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.line .time { font-weight: 600; font-variant-numeric: tabular-nums; }
+.line .time.fired { color: var(--fired); }
+.line .time.blue { color: var(--ico); }
+
+/* Dlaždice s číslem (přes noc) */
+/* Dlaždice: text nikdy nepřeteče. Název nejvýš na dva řádky, číslo na jeden, popisek nejvýš na dva, jinak tři
+   tečky. Slovo se láme, jen když se celé nevejde ani na řádek. Při čtyřech a víc dlaždicích (.many, s doplňky
+   Merora DEV) je všechno menší. Víc než 5 jich nebude (MAX_TILES v tools/brief.mjs). */
+.stat-tile { padding: 16px 22px; border-radius: 24px; display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow: hidden; }
+.stat-tile.on { transform: scale(1.05); }
+.stat-tile .header { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.stat-tile .header .tile { flex: none; }
+.stat-tile .tile { width: 40px; height: 40px; border-radius: 11px; }
+.stat-tile .title { min-width: 0; font-size: 22px; line-height: 28px; font-weight: 500; color: var(--ink-card); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: break-word; }
+/* Dlaždice, jejíž data se načítají (maily, doplňky přes Clauda): místo čísla a popisku kolečko a „Načítám…“. */
+.stat-tile { position: relative; }
+.stat-tile .loading-note { display: none; align-items: center; gap: 10px; min-width: 0; font-size: 20px; line-height: 26px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat-tile .loading-note .spinner { flex: none; }
+.stat-tile.loading .value, .stat-tile.loading .caption { display: none; }
+.stat-tile.loading .loading-note { display: flex; min-height: 94px; }
+.spinner { width: 20px; height: 20px; border-radius: 50%; border: 3px solid #2a2a33; border-top-color: var(--ico); animation: otacej .9s linear infinite; }
+.stat-tile .value { font-size: 60px; line-height: 68px; font-weight: 700; letter-spacing: -1.5px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat-tile .caption { font-size: 20px; line-height: 26px; color: var(--ink-2); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: break-word; }
+.app-tiles.many .stat-tile { padding: 14px; }
+.app-tiles.many .stat-tile .header { gap: 8px; }
+.app-tiles.many .stat-tile .tile { width: 28px; height: 28px; border-radius: 8px; }
+.app-tiles.many .stat-tile .title { font-size: 17px; line-height: 22px; }
+.app-tiles.many .stat-tile .value { font-size: 48px; line-height: 56px; }
+.app-tiles.many .stat-tile .caption, .app-tiles.many .stat-tile .loading-note { font-size: 17px; line-height: 22px; }
+.app-tiles.many .stat-tile.loading .loading-note { min-height: 78px; }
+.stat-tile .caption.fired { color: var(--fired); }
+
+/* Panel se seznamem (chyby, maily) */
+.panel { flex: 1; min-height: 0; padding: 18px 24px; border-radius: 24px; display: flex; flex-direction: column; justify-content: center; gap: 16px; }
+.panel .heading { display: flex; align-items: center; gap: 10px; font-size: 20px; line-height: 26px; color: var(--ink-2); }
+.panel .heading .tile { width: 34px; height: 34px; border-radius: 10px; }
+.panel .item { display: flex; flex-direction: column; gap: 4px; }
+.panel .divider { height: 2px; background: var(--line); }
+.panel .item-title { font-size: 25px; line-height: 31px; font-weight: 500; }
+.panel .meta { display: flex; align-items: center; gap: 10px; font-size: 19px; line-height: 24px; color: var(--ink-2); }
+.label { padding: 2px 14px; border-radius: 16px; font-weight: 600; }
+.label.fired { background: var(--fired-tile); color: var(--fired); }
+.label.grey { background: #1c1c22; color: var(--ink-2); }
+
+/* Bublina: věty shrnutí, rozhovor a rada leží přes sebe, vidět je vždycky jen jedna. Má aspoň tři řádky
+   a delší odpověď (víc než tři řádky) ji natáhne dolů do volného místa nad mikrofonem, text nepřeteče. */
+.bubble {
+  position: relative; flex: none; width: 100%; min-height: 196px; box-sizing: border-box; padding: 25px 36px;
+  border-radius: 34px; background: var(--bubble); border: 2px solid var(--bubble-line);
+  box-shadow: 0 0 24px rgba(70, 110, 255, .28);
+  display: grid; place-items: center; text-align: center;
+  font-size: 34px; line-height: 46px; color: var(--bubble-ink);
+  opacity: .002; transition: opacity .2s ease;
+}
+.bubble.visible { opacity: 1; }
+.bubble .tail {
+  position: absolute; top: -17px; left: 50%; margin-left: -15px; width: 30px; height: 30px; box-sizing: border-box;
+  background: var(--bubble); border-top: 2px solid var(--bubble-line); border-left: 2px solid var(--bubble-line);
+  transform: rotate(45deg);
+}
+.bubble .sentence { grid-area: 1 / 1; opacity: .002; transition: opacity .12s linear; }
+.bubble .sentence.on { opacity: 1; }
+/* Rada, než Meri mluví: menší a tlumenější než její věty. */
+.bubble .hint { font-size: 28px; line-height: 38px; color: var(--ink-2); }
+
+/* Tlačítko mikrofonu: vypnutý je tlumený, zapnutý má modrý okraj, když Meri opravdu poslouchá, svítí celý. */
+/* Stav telefonu po změně z počítače: nad mikrofonem, místo má pořád stejné, ať se nic neposouvá. */
+.phone-status {
+  flex: none; width: 100%; min-height: 40px; margin-top: auto; box-sizing: border-box; padding: 0 8px;
+  display: flex; align-items: center; justify-content: center; gap: 10px; text-align: center;
+  font-size: 21px; line-height: 26px; color: var(--ink-2); opacity: .002; transition: opacity .3s ease;
+}
+.phone-status.visible { opacity: 1; }
+.phone-status svg { flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.phone-status.ok { color: var(--ico); }
+.phone-status.warn { color: var(--fired); }
+.phone-status + .mic { margin-top: 12px; }
+.mic {
+  flex: none; width: 100%; height: 72px; margin-top: auto; box-sizing: border-box; padding: 0 24px;
+  border-radius: 24px; border: 2px solid #23232e; background-color: var(--control); color: var(--ink-2);
+  display: flex; align-items: center; gap: 14px; font: inherit; text-align: left; cursor: pointer;
+  transition: background-color .3s ease, border-color .3s ease, color .2s ease;
+}
+.mic:hover, .mic.enabled { color: #fff; }
+.mic.enabled { border-color: var(--bubble-line); }
+.mic.active { background-color: var(--bubble); }
+.mic svg { display: block; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mic .icon-on, .mic.enabled .icon-off { display: none; }
+.mic.enabled .icon-on { display: block; color: var(--ico); }
+.mic .what { flex: 1; min-width: 0; font-size: 25px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mic .key { flex: none; padding: 2px 10px; border-radius: 8px; border: 1px solid var(--edge); font-size: 18px; line-height: 24px; color: var(--ink-2); }
+
+/* Nastavení: kolečko v rohu okna (mimo plátno, ať má pořád stejnou velikost) a okno přes obrazovku. */
+.gear {
+  position: fixed; right: 16px; top: 16px; z-index: 20; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 22px;
+  background: rgba(16, 16, 26, .85); color: var(--ink-2); display: grid; place-items: center; cursor: pointer; transition: opacity .3s ease, color .2s ease;
+}
+.gear:hover { color: #fff; }
+body.no-cursor .gear { opacity: 0; pointer-events: none; }
+
+/* Hlas vlevo nahoře a nová data vedle kolečka. Zmizí jako kolečko, šipka ne, dokud se data načítají. */
+.corner {
+  position: fixed; top: 16px; z-index: 20; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 22px;
+  background: rgba(16, 16, 26, .85); color: var(--ink-2); display: grid; place-items: center; cursor: pointer; transition: opacity .3s ease, color .2s ease;
+}
+.corner:hover { color: #fff; }
+body.no-cursor .corner:not(.spinning) { opacity: 0; pointer-events: none; }
+.corner svg { display: block; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.voice-button { left: 16px; }
+.voice-button .icon-on, .voice-button.enabled .icon-off { display: none; }
+.voice-button.enabled .icon-on { display: block; color: var(--ico); }
+.refresh { right: 68px; }
+.refresh.spinning svg { animation: spin 1.2s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.corner .tooltip {
+  position: absolute; top: 52px; padding: 6px 12px; border-radius: 10px; background: rgba(16, 16, 26, .95); color: var(--ink-2);
+  font-size: 14px; line-height: 19px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .2s ease;
+}
+.voice-button .tooltip { left: 0; }
+.refresh .tooltip { right: 0; }
+.corner:hover .tooltip, .corner .tooltip.shown { opacity: 1; }
+body.no-cursor .corner .tooltip:not(.shown) { opacity: 0; }
+
+.gear svg, .settings svg { display: block; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.settings { position: fixed; inset: 0; z-index: 30; background: rgba(0, 0, 0, .6); display: grid; place-items: center; }
+.settings .dialog-box { width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto; scrollbar-color: #2a2a33 transparent; box-sizing: border-box; padding: 20px 24px; border-radius: 24px; background: var(--card); border: 1px solid #23232e; }
+.settings header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.settings h2 { margin: 0; font-size: 22px; line-height: 28px; font-weight: 700; }
+.settings h3 { margin: 12px 0 0; padding-top: 16px; border-top: 1px solid var(--line); font-size: 13px; line-height: 18px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--ink-2); }
+.settings h3.first { margin-top: 4px; }
+.settings .close { padding: 8px; border: 0; border-radius: 10px; background: none; color: var(--ink-2); cursor: pointer; }
+.settings .close:hover { color: #fff; }
+.settings .option { display: flex; align-items: center; gap: 20px; padding: 16px 0; border-top: 1px solid var(--line); }
+.settings .description { flex: 1; min-width: 0; }
+.settings .title { font-size: 18px; line-height: 24px; font-weight: 600; }
+.settings .caption { margin-top: 4px; font-size: 15px; line-height: 21px; color: var(--ink-2); }
+.settings .source { padding: 12px 0; gap: 14px; border-top: 0; }
+.settings .source .tile { width: 36px; height: 36px; border-radius: 10px; }
+.settings .source .title { font-size: 16px; line-height: 22px; }
+.settings .source .caption { font-size: 14px; line-height: 19px; margin-top: 2px; }
+.settings .warning { color: var(--fired); }
+.settings .done { color: #6fd39a; }
+.settings .note { margin: 4px 0 0; font-size: 14px; line-height: 19px; color: var(--ink-2); }
+.settings .flash { animation: flash 1s ease; }
+@keyframes flash { 0%, 60% { color: var(--fired); } 100% { color: var(--ink-2); } }
+.settings .refresh-block { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+.settings .refresh-block .caption { margin-top: 10px; }
+.settings .row { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.settings .row .caption { margin-top: 0; }
+.settings .row input { flex: 1; min-width: 180px; width: auto; }
+.settings .field { display: flex; flex-direction: column; gap: 6px; margin: 12px 0 0; border: 0; padding: 0; }
+.settings .field > span, .settings legend { font-size: 14px; color: var(--ink-2); padding: 0; }
+.settings input:not([type="radio"]), .settings select {
+  box-sizing: border-box; width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--edge);
+  background: var(--control); color: #fff; font: inherit; font-size: 16px;
+}
+/* Výběr s vlastní šipkou: ta systémová byla až u okraje a vypadala, že z pole přetéká (Riccardo 23. 11.). */
+.settings select {
+  appearance: none; -webkit-appearance: none; padding-right: 44px; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23aaaaaa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 16px center; background-size: 18px;
+}
+.settings .option-row { display: flex; align-items: center; gap: 10px; font-size: 16px; padding: 4px 0; cursor: pointer; }
+
+.switch { flex: none; width: 52px; height: 32px; padding: 3px; border: 0; border-radius: 16px; background: #2a2a33; cursor: pointer; transition: background .2s ease; }
+.switch[aria-checked="true"] { background: var(--ico); }
+.switch .knob { display: block; width: 26px; height: 26px; border-radius: 13px; background: #fff; transition: transform .2s ease; }
+.switch[aria-checked="true"] .knob { transform: translateX(20px); }
+.button { padding: 10px 18px; border: 0; border-radius: 12px; background: var(--tile); color: #fff; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; transition: background .2s ease; }
+.button:hover { background: #22304a; }
+.button.secondary { background: transparent; border: 1px solid var(--edge); color: var(--ink-2); }
+.button.secondary:hover { color: #fff; }
+.button:disabled { opacity: .5; cursor: default; }
+.gear:focus-visible, .corner:focus-visible, .switch:focus-visible, .button:focus-visible, .mic:focus-visible, .settings .close:focus-visible { outline: 2px solid var(--bubble-line); outline-offset: 2px; }
+.settings input:focus-visible, .settings select:focus-visible { outline: 2px solid var(--bubble-line); outline-offset: 1px; }
+
+/* Nastavení po částech jako v Claudovi: vlevo menu, vpravo obsah jedné části. Na úzkém okně je menu nahoře. */
+.settings .dialog-box.section-window {
+  width: min(880px, calc(100vw - 32px)); height: min(640px, calc(100vh - 32px)); max-height: none;
+  display: flex; flex-direction: column; overflow: hidden; padding: 0;
+}
+.settings .section-window > header { margin: 0; padding: 16px 16px 14px 24px; border-bottom: 1px solid var(--line); }
+.settings .content-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 200px minmax(0, 1fr); }
+.settings .menu { display: flex; flex-direction: column; gap: 4px; padding: 16px 12px; border-right: 1px solid var(--line); overflow-y: auto; }
+.settings .menu-item {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 0; border-radius: 10px;
+  background: none; color: var(--ink-2); font: inherit; font-size: 15px; text-align: left; cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.settings .menu-item:hover { color: #fff; background: #15151b; }
+.settings .menu-link { text-decoration: none; }
+.settings .menu-link .external { margin-left: auto; display: flex; opacity: .6; }
+.settings .menu-item[aria-current="true"] { color: #fff; background: var(--tile); }
+.settings .menu-item[aria-current="true"] svg { color: var(--ico); }
+.settings .menu-item:focus-visible { outline: 2px solid var(--bubble-line); outline-offset: 1px; }
+.settings .content { overflow-y: auto; padding: 8px 24px 28px; scrollbar-color: #2a2a33 transparent; }
+.settings .content h3.first { margin-top: 8px; padding-top: 8px; border-top: 0; }
+.settings .account { display: flex; align-items: center; gap: 14px; margin-top: 12px; }
+.settings .account .tile { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; flex: none; }
+.settings .account .title { overflow-wrap: anywhere; }
+.settings #account-buttons .connect { margin-top: 0; padding: 10px 18px; font-size: 15px; }
+.settings .fixed, .settings .own { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.settings .fixed li { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; line-height: 21px; color: var(--ink-card); }
+.settings .fixed svg { flex: none; margin-top: 2px; color: var(--ink-2); }
+.settings .fixed + .caption { margin-top: 12px; }
+.settings .own:empty { display: none; }
+.settings .own li {
+  display: flex; gap: 10px; align-items: center; padding: 10px 8px 10px 12px; border-radius: 10px;
+  background: var(--control); border: 1px solid var(--edge); font-size: 15px; line-height: 21px;
+}
+.settings .own li span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.settings .delete-rule { flex: none; padding: 4px; border: 0; border-radius: 8px; background: none; color: var(--ink-2); cursor: pointer; }
+.settings .delete-rule:hover { color: #fff; }
+.settings .section-link, .settings .link-button { padding: 0; border: 0; background: none; color: var(--ico); font: inherit; cursor: pointer; text-decoration: underline; }
+/* Aktualizace v nastavení › O aplikaci */
+.settings .update-box { margin-top: 14px; }
+.settings .update-title { font-size: 16px; font-weight: 600; color: #fff; }
+.settings .update-notes { margin-top: 6px; max-height: 160px; overflow-y: auto; white-space: pre-wrap; font-size: 14px; line-height: 20px; color: var(--ink-2); padding: 10px 12px; border-radius: 10px; background: var(--control); border: 1px solid var(--edge); }
+/* Upozornění na novou verzi nahoře uprostřed (klik otevře nastavení) */
+.update-pill {
+  position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 20; padding: 7px 16px; border: 1px solid var(--edge);
+  border-radius: 18px; background: rgba(16, 16, 26, .9); color: var(--ink-2); font: inherit; font-size: 14px; cursor: pointer;
+}
+.update-pill:hover { color: #fff; }
+.update-pill:focus-visible { outline: 2px solid var(--bubble-line); outline-offset: 2px; }
+@media (max-width: 640px) {
+  .settings .content-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .settings .menu { flex-direction: row; overflow-x: auto; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .settings .menu-item { flex: none; white-space: nowrap; }
+  .settings .content { padding: 4px 16px 24px; }
+}
+
+/* Řádek zdroje: vložení odkazu (kalendář) a kontrola propojení (Merora). */
+.settings .link { display: flex; gap: 8px; margin-top: 8px; }
+.settings .link input { flex: 1; min-width: 0; width: auto; padding: 8px 10px; font-size: 14px; }
+.settings .link .button { padding: 8px 14px; }
+.settings .check { margin-top: 8px; padding: 6px 12px; font-size: 14px; }
+a.button { display: inline-block; text-decoration: none; }
+.settings .connect { margin-top: 8px; padding: 6px 12px; font-size: 14px; }
+.settings .other-voice { display: inline-block; margin: 0 0 8px; color: var(--ico); text-decoration: none; }
+.settings .other-voice:hover { text-decoration: underline; }
+
+/* Úvod při prvním otevření (vitej.js) */
+.welcome .dialog-box { width: min(600px, calc(100vw - 32px)); padding: 24px 28px 20px; }
+.welcome h2 { font-size: 26px; line-height: 32px; }
+.welcome .step { min-height: 200px; font-size: 17px; line-height: 25px; color: var(--ink-card); }
+.welcome .step p { margin: 8px 0; }
+.welcome .error { color: var(--fired); min-height: 21px; margin: 6px 0 0; }
+.welcome footer { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding-top: 16px; border-top: 1px solid var(--line); }
+.welcome .dots { flex: 1; display: flex; gap: 6px; }
+.welcome .dots span { width: 7px; height: 7px; border-radius: 4px; background: var(--edge); }
+.welcome .dots span.on { background: var(--ico); }
+.welcome .keys { margin: 8px 0 16px; padding-left: 20px; }
+.welcome .keys li { margin: 6px 0; }
+.welcome kbd { padding: 1px 8px; border-radius: 6px; border: 1px solid var(--edge); font: inherit; font-size: 14px; }
+.welcome .install { margin-top: 8px; }
+.welcome .steps { margin: 8px 0 14px; padding-left: 22px; }
+.welcome .steps li { margin: 6px 0; }
+.welcome .address { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.welcome code { flex: 1; min-width: 0; overflow-wrap: anywhere; padding: 6px 8px; border-radius: 8px; background: var(--control); border: 1px solid var(--edge); font-size: 13px; line-height: 18px; user-select: all; }
+.welcome a { color: var(--ico); }

@@ -1,0 +1,76 @@
+{
+  "id": "nic",
+  "title": "Nic na dnešek, bez oslovení",
+  "description": "Bez oslovení, na dnešek nic s časem, jen Kdykoli a připomínka jen s místem (ani jedna do boxu nepatří), žádné nepřečtené maily, kalendář prázdný. Má vlastní pravidlo, ať o počasí mluví, jen když bude pršet (a pršet nebude).",
+  "now": "2026-11-24T08:00",
+  "settings": {
+    "salutation": "",
+    "gender": "male",
+    "briefLength": "normal"
+  },
+  "sources": {
+    "merora": [
+      {
+        "id": 401,
+        "text": "Přečíst knihu"
+      },
+      {
+        "id": 402,
+        "text": "Koupit žárovky",
+        "place": "Hornbach"
+      }
+    ],
+    "calendar": [],
+    "weather": {
+      "temperature": 12,
+      "description": "jasno",
+      "lowest": 6,
+      "highest": 14,
+      "precipitation_chance": 0
+    },
+    "gmail": {
+      "count": 0,
+      "more": false,
+      "mails": []
+    }
+  },
+  "expected": {
+    "greeting": "Dobré ráno.",
+    "maxSentences": 3,
+    "notMention": [
+      "knih",
+      "žárovk",
+      "Hornbach",
+      "stupň",
+      "deštník"
+    ],
+    "notInBox": [
+      "r401",
+      "r402"
+    ]
+  },
+  "conversation": [
+    {
+      "say": "Co mám v Kdykoli?",
+      "action": [
+        "info"
+      ]
+    },
+    {
+      "say": "Smaž všechny připomínky.",
+      "action": [
+        "unclear",
+        "unsupported"
+      ]
+    },
+    {
+      "say": "Takhle vše.",
+      "action": [
+        "end"
+      ]
+    }
+  ],
+  "rules": [
+    "O počasí mluv, jen když bude pršet."
+  ]
+}

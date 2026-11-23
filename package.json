@@ -1,0 +1,18 @@
+{
+  "name": "merora-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Merora na počítači: ranní shrnutí a rozhovor s Meri.",
+  "scripts": {
+    "start": "node server.mjs",
+    "video": "node server.mjs --video --port 4748",
+    "setup": "node tools/install.mjs setup",
+    "brief": "node tools/brief.mjs",
+    "voice": "node tools/voice.mjs",
+    "reminder": "node tools/reminder.mjs",
+    "test": "node tools/personas.mjs",
+    "background": "node tools/install.mjs background",
+    "hotkey": "node tools/install.mjs hotkey"
+  }
+}

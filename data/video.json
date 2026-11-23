@@ -1,0 +1,269 @@
+{
+  "time": "7:42",
+  "greeting": "Dobré ráno, Riki.",
+  "weather": {
+    "id": "weather",
+    "temperature": "4 °C",
+    "precipitation": "srážky 90 %"
+  },
+  "today": [
+    {
+      "id": "r1",
+      "icon": "phone",
+      "tone": "fired",
+      "title": "Zavolat tátovi",
+      "time": "včera 18:00",
+      "meta": "zazvonilo 2×"
+    },
+    {
+      "id": "r2",
+      "icon": "calendar",
+      "tone": "blue",
+      "title": "Hovor s testerem",
+      "time": "10:00",
+      "meta": ""
+    },
+    {
+      "id": "r3",
+      "icon": "clapper",
+      "tone": "blue",
+      "title": "Natáčení",
+      "time": "14:00",
+      "meta": "video o Jarvisovi"
+    },
+    {
+      "id": "chyby",
+      "icon": "bug",
+      "tone": "fired",
+      "title": "2 nové chyby",
+      "meta": "přes noc · detail vpravo"
+    },
+    {
+      "id": "r4",
+      "icon": "basket",
+      "tone": "blue",
+      "title": "Nakoupit",
+      "meta": "až dorazíš do obchodu"
+    },
+    {
+      "id": "r5",
+      "icon": "repeat",
+      "tone": "blue",
+      "title": "Večerní rutina",
+      "time": "22:00",
+      "meta": "každý den"
+    }
+  ],
+  "tiles": [
+    {
+      "id": "chyby",
+      "icon": "bug",
+      "tone": "fired",
+      "title": "Chyby v appce",
+      "value": "2",
+      "caption": "Nové přes noc",
+      "captionTone": "fired"
+    },
+    {
+      "id": "mails",
+      "icon": "mail",
+      "tone": "blue",
+      "title": "Nepřečtené maily",
+      "value": "2",
+      "caption": "Spěchá: 1",
+      "captionTone": "fired"
+    },
+    {
+      "id": "program",
+      "icon": "calendar",
+      "tone": "blue",
+      "title": "Dnes na programu",
+      "value": "6",
+      "caption": "Věcí k vyřízení"
+    }
+  ],
+  "errors": [
+    {
+      "title": "Připomínka na místo nezazvonila",
+      "meta": "Chyba 1 · poprvé včera 21:40"
+    },
+    {
+      "title": "Pád při otevření oznámení",
+      "meta": "Chyba 2 · poprvé dnes 6:12"
+    }
+  ],
+  "mails": [
+    {
+      "subject": "Nezazvonilo mi to při příchodu do obchodu.",
+      "who": "Tester 1 · včera 22:14",
+      "label": "Spěchá",
+      "tone": "fired"
+    },
+    {
+      "subject": "Šlo by přidat víc hlídaných míst k seznamu?",
+      "who": "Tester 2 · včera 19:03",
+      "label": "Počká",
+      "tone": "grey"
+    }
+  ],
+  "inbox": {
+    "count": 2,
+    "more": false,
+    "mails": [
+      {
+        "subject": "Nezazvonilo mi to při příchodu do obchodu.",
+        "from": "Tester 1",
+        "about": "Připomínka na místo mu u obchodu nezazvonila.",
+        "when": "včera 22:14",
+        "kind": "person",
+        "important": true,
+        "urgent": true,
+        "tester": true
+      },
+      {
+        "subject": "Šlo by přidat víc hlídaných míst k seznamu?",
+        "from": "Tester 2",
+        "about": "Chtěl by u jednoho seznamu hlídat víc míst.",
+        "when": "včera 19:03",
+        "kind": "person",
+        "important": true,
+        "urgent": false,
+        "tester": true
+      }
+    ]
+  },
+  "sentences": [
+    {
+      "id": "rano",
+      "text": "Dobré ráno, Riki."
+    },
+    {
+      "id": "video-tata",
+      "text": "Včera jsi chtěl zavolat tátovi, připomínka na to zvonila už dvakrát.",
+      "highlight": [
+        "r1"
+      ],
+      "ends": [
+        "n2"
+      ]
+    },
+    {
+      "id": "video-tester",
+      "text": "V deset máš hovor s testerem",
+      "highlight": [
+        "r2"
+      ],
+      "ends": [
+        "n2"
+      ],
+      "gap": 0.08
+    },
+    {
+      "id": "video-nataceni",
+      "text": "a ve dvě natáčení videa o Jarvisovi.",
+      "highlight": [
+        "r3"
+      ],
+      "ends": [
+        "n3"
+      ]
+    },
+    {
+      "id": "chyby",
+      "text": "Objevily se dvě nové chyby, ale to jednoduše vyřešíme.",
+      "highlight": [
+        "chyby"
+      ],
+      "ends": [
+        "n3",
+        "n5"
+      ]
+    },
+    {
+      "id": "nakup",
+      "text": "Po práci chceš nakoupit, připomenu ti co, až dorazíš do obchodu.",
+      "highlight": [
+        "r4"
+      ],
+      "ends": [
+        "n4"
+      ]
+    },
+    {
+      "id": "video-pocasi",
+      "text": "Venku jsou čtyři stupně a skoro jistě bude pršet, tak si vezmi deštník.",
+      "highlight": [
+        "weather"
+      ],
+      "ends": [
+        "n2"
+      ]
+    },
+    {
+      "id": "video-rutina",
+      "text": "A večer v deset máš rutinu.",
+      "highlight": [
+        "r5"
+      ],
+      "ends": [
+        "n4"
+      ]
+    }
+  ],
+  "reminders": [
+    {
+      "id": 1,
+      "task": "Zavolat tátovi",
+      "when": "-1 18:00",
+      "trigger_count": 2
+    },
+    {
+      "id": 2,
+      "task": "Hovor s testerem",
+      "when": "0 10:00"
+    },
+    {
+      "id": 3,
+      "task": "Natáčení videa o Jarvisovi",
+      "when": "0 14:00"
+    },
+    {
+      "id": 4,
+      "task": "Nakoupit",
+      "place_id": 1,
+      "place_name": "Obchod"
+    },
+    {
+      "id": 5,
+      "task": "Večerní rutina",
+      "when": "0 22:00",
+      "recurrence_type": "daily"
+    },
+    {
+      "id": 6,
+      "task": "Nákupní seznam",
+      "steps": {
+        "kind": "list",
+        "items": [
+          {
+            "id": "nakup1",
+            "text": "Vejce"
+          },
+          {
+            "id": "nakup2",
+            "text": "Mléko"
+          }
+        ],
+        "permanent": true
+      },
+      "step_state": {
+        "items": {
+          "nakup2": {
+            "s": "done",
+            "at": "2026-11-19T17:00:00.000Z"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Merora · propojení s účtem</title>
+<style>
+  :root { --karta: #10101a; --linka: #2a2a33; --text2: #aaaaaa; --modra: #5680f5; --oranz: #ff8a6a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif; line-height: 1.45; }
+  main { max-width: 480px; margin: 0 auto; padding: 40px 16px 64px; }
+  h1 { margin: 0 0 8px; font-size: 32px; font-weight: 800; letter-spacing: -.5px; }
+  p { margin: 0 0 20px; color: var(--text2); font-size: 16px; }
+  form, section { background: var(--karta); border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+  section p { margin: 0; }
+  label { font-size: 14px; font-weight: 600; }
+  input { width: 100%; min-height: 48px; padding: 0 14px; border: 1px solid var(--linka); border-radius: 12px; background: #000; color: #fff; font: inherit; font-size: 18px; }
+  input:focus-visible { outline: 2px solid var(--modra); outline-offset: 1px; }
+  button, .button { display: flex; align-items: center; justify-content: center; min-height: 48px; border: 0; border-radius: 24px; background: var(--modra); color: #fff; font: inherit; font-weight: 600; text-decoration: none; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  button:focus-visible, .button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .note { font-size: 14px; }
+  [hidden] { display: none; }
+  #status { min-height: 24px; margin: 16px 0 0; color: #fff; font-weight: 500; }
+  #status.error { color: var(--oranz); }
+</style>
+</head>
+<body>
+<!-- Texty doplní skript v jazyce z nastavení (public/i18n.js, klíče v data-i18n). Do té doby je stránka schovaná. -->
+<main hidden>
+  <h1 data-i18n="loginHeading"></h1>
+  <p data-i18n="loginIntro"></p>
+
+  <section>
+    <p data-i18n="loginHow"></p>
+    <a id="connect" class="button" href="/oauth/start" data-i18n="connectMerora"></a>
+    <p class="note" data-i18n="loginNote"></p>
+  </section>
+
+  <p id="status" role="status" aria-live="polite"></p>
+</main>
+<script type="module">
+import { setLanguage, t } from '/i18n.js';
+
+// Jazyk z nastavení; když server neodpoví, česky.
+const settings = await fetch('/api/settings').then((r) => r.json()).catch(() => ({}));
+setLanguage(settings.language ?? 'cs');
+document.title = t('loginTitle');
+for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t(el.dataset.i18n);
+document.querySelector('main').hidden = false;
+
+const statusEl = document.getElementById('status');
+const setStatus = (text, error = false) => {
+  statusEl.textContent = text;
+  statusEl.classList.toggle('error', error);
+};
+
+// Návrat z Merory: jen kódy, žádný text z adresy.
+const ERRORS = {
+  denied: t('loginDenied'),
+  expired: t('loginExpired'),
+  failed: t('loginFailed'),
+  not_configured: t('loginNotConfigured'),
+};
+const query = new URLSearchParams(location.search);
+const connectedCount = query.get('connected');
+const returnError = ERRORS[query.get('error')];
+if (query.size) history.replaceState(null, '', location.pathname);
+
+const s = await (await fetch('/api/merora/status')).json();
+if (s.connected) document.getElementById('connect').textContent = t('connectAgain');
+
+if (connectedCount !== null) setStatus(t('loginConnected', { count: Number(connectedCount) || 0 }));
+else if (returnError) setStatus(returnError, true);
+else if (s.connected) setStatus(t('loginAlreadyConnected'));
+</script>
+</body>
+</html>

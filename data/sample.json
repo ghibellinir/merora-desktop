@@ -1,0 +1,149 @@
+{
+  "sample": true,
+  "greeting": "Dobré ráno.",
+  "weather": {
+    "id": "weather",
+    "temperature": "4 °C",
+    "precipitation": "srážky 80 %"
+  },
+  "today": [
+    {
+      "id": "k1",
+      "icon": "calendar",
+      "tone": "blue",
+      "title": "Porada s týmem",
+      "time": "9:30",
+      "meta": "kalendář"
+    },
+    {
+      "id": "r2",
+      "icon": "bell",
+      "tone": "blue",
+      "title": "Vyzvednout balík",
+      "time": "12:00",
+      "meta": "Merora"
+    },
+    {
+      "id": "k2",
+      "icon": "calendar",
+      "tone": "blue",
+      "title": "Zubař",
+      "time": "16:00",
+      "meta": "kalendář"
+    },
+    {
+      "id": "r4",
+      "icon": "repeat",
+      "tone": "blue",
+      "title": "Večerní rutina",
+      "time": "21:00",
+      "meta": "každý den"
+    },
+    {
+      "id": "r1",
+      "icon": "phone",
+      "tone": "fired",
+      "title": "Zavolat tátovi",
+      "time": "včera 18:00",
+      "meta": "zazvonilo 2×"
+    },
+    {
+      "id": "r3",
+      "icon": "basket",
+      "tone": "blue",
+      "title": "Nakoupit",
+      "meta": "až dorazíš do obchodu"
+    }
+  ],
+  "tiles": [
+    {
+      "id": "mails",
+      "icon": "mail",
+      "tone": "blue",
+      "title": "Nepřečtené maily",
+      "value": "2",
+      "caption": "Spěchá: 1",
+      "captionTone": "fired"
+    },
+    {
+      "id": "program",
+      "icon": "calendar",
+      "tone": "blue",
+      "title": "Dnes na programu",
+      "value": "6",
+      "caption": "Věcí k vyřízení"
+    }
+  ],
+  "errors": [],
+  "mails": [
+    {
+      "subject": "Stihneš to do pátku?",
+      "who": "včera 22:14",
+      "label": "Spěchá",
+      "tone": "fired"
+    },
+    {
+      "subject": "Sraz v sobotu?",
+      "who": "včera 19:03",
+      "label": "Počká",
+      "tone": "grey"
+    }
+  ],
+  "sentences": [
+    {
+      "id": "ukazka-rano",
+      "text": "Dobré ráno. Tohle je ukázkový den, tvůj si nachystám, až mi řekneš „Jak to dnes vypadá?“"
+    },
+    {
+      "id": "ukazka-dopoledne",
+      "text": "V půl desáté máš poradu s týmem a v poledne vyzvednout balík.",
+      "highlight": [
+        "k1",
+        "r2"
+      ],
+      "ends": [
+        "n3"
+      ]
+    },
+    {
+      "id": "ukazka-zubar",
+      "text": "Odpoledne ve čtyři tě čeká zubař.",
+      "highlight": [
+        "k2"
+      ],
+      "ends": [
+        "n3"
+      ]
+    },
+    {
+      "id": "ukazka-maily",
+      "text": "Nepřečtené maily máš dva, jeden z nich spěchá.",
+      "highlight": [
+        "mails"
+      ],
+      "ends": [
+        "n2"
+      ]
+    },
+    {
+      "id": "ukazka-pocasi",
+      "text": "Venku jsou čtyři stupně a skoro jistě bude pršet, tak si vezmi deštník.",
+      "highlight": [
+        "weather"
+      ],
+      "ends": [
+        "n2"
+      ]
+    },
+    {
+      "id": "ukazka-vecer",
+      "text": "A večer v devět máš rutinu.",
+      "highlight": [
+        "r4"
+      ],
+      "ends": [
+        "n4"
+      ]
+    }
+  ]
+}

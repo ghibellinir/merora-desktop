@@ -1,0 +1,158 @@
+{
+  "id": "stranky",
+  "title": "Plný den na tři stránky",
+  "description": "Patnáct připomínek s časem na dnešek, do boxu se vejdou jen na tři stránky. Meri má z každé stránky vybrat pár nejdůležitějších věcí a říct, že je toho víc, ať se na to mrkne. Nákupní seznam jen s místem do boxu nepatří.",
+  "now": "2026-11-26T07:30",
+  "settings": {
+    "salutation": "Ondro",
+    "gender": "male",
+    "briefLength": "normal"
+  },
+  "sources": {
+    "merora": [
+      {
+        "id": 801,
+        "text": "Ranní stand-up",
+        "when": "2026-11-26T08:00"
+      },
+      {
+        "id": 802,
+        "text": "Zavolat účetní",
+        "when": "2026-11-26T08:30"
+      },
+      {
+        "id": 803,
+        "text": "Poslat nabídku klientovi",
+        "when": "2026-11-26T09:00"
+      },
+      {
+        "id": 804,
+        "text": "Kontrola faktur",
+        "when": "2026-11-26T09:30"
+      },
+      {
+        "id": 805,
+        "text": "Schůzka s grafikem",
+        "when": "2026-11-26T10:00"
+      },
+      {
+        "id": 806,
+        "text": "Odpovědět na maily",
+        "when": "2026-11-26T11:00"
+      },
+      {
+        "id": 807,
+        "text": "Oběd s Petrem",
+        "when": "2026-11-26T11:30"
+      },
+      {
+        "id": 808,
+        "text": "Vyzvednout klíče od bytu",
+        "when": "2026-11-26T12:00"
+      },
+      {
+        "id": 809,
+        "text": "Zaplatit nájem",
+        "when": "2026-11-26T13:00"
+      },
+      {
+        "id": 810,
+        "text": "Natočit video",
+        "when": "2026-11-26T14:00"
+      },
+      {
+        "id": 811,
+        "text": "Zubař",
+        "when": "2026-11-26T15:00"
+      },
+      {
+        "id": 812,
+        "text": "Koupit dárek pro mámu",
+        "when": "2026-11-26T15:30"
+      },
+      {
+        "id": 813,
+        "text": "Vyzvednout děti ze školky",
+        "when": "2026-11-26T16:00"
+      },
+      {
+        "id": 814,
+        "text": "Trénink",
+        "when": "2026-11-26T17:00"
+      },
+      {
+        "id": 815,
+        "text": "Večeře s rodiči",
+        "when": "2026-11-26T18:30"
+      },
+      {
+        "id": 820,
+        "text": "Nákupní seznam",
+        "place": "Albert",
+        "list": [
+          "Mléko",
+          "Chleba",
+          "Rajčata"
+        ]
+      }
+    ],
+    "calendar": [],
+    "weather": {
+      "temperature": 3,
+      "description": "zataženo",
+      "lowest": 1,
+      "highest": 6,
+      "precipitation_chance": 20
+    },
+    "gmail": {
+      "count": 0,
+      "more": false,
+      "mails": []
+    }
+  },
+  "expected": {
+    "greeting": "Dobré ráno, Ondro",
+    "everyPage": true,
+    "mention": [
+      {
+        "what": "že je toho víc, ať se mrkne na obrazovku",
+        "words": [
+          "obrazovk",
+          "víc",
+          "další"
+        ]
+      }
+    ],
+    "inBox": [
+      "r801",
+      "r802",
+      "r803",
+      "r804",
+      "r805",
+      "r806",
+      "r807",
+      "r808",
+      "r809",
+      "r810",
+      "r811",
+      "r812",
+      "r813",
+      "r814",
+      "r815"
+    ],
+    "notInBox": [
+      "r820"
+    ],
+    "notMention": [
+      "boxu"
+    ]
+  },
+  "conversation": [
+    {
+      "say": "Co mám odpoledne?",
+      "action": [
+        "info"
+      ]
+    }
+  ]
+}
