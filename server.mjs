@@ -643,6 +643,13 @@ async function refreshWithoutAI() {
   }
 }
 
+// Nově propojený zdroj (kalendář, Gmail) nebo jiné město: nová data potichu hned, ne až podle intervalu. Nepropojený
+// zdroj ve shrnutí není, takže by ho živá data nedohnala. Při prvním úvodu (ukázkový den) se čeká na jeho konec.
+function loadAfterConnecting() {
+  if (VIDEO || process.env.MERI_DATA || currentData().sample) return;
+  prepare(null, { again: true, quiet: true, day: 'today' });
+}
+
 function runCollection(extraArgs = []) {
   let reason = tr('briefFailed');
   let ended = false;
@@ -882,12 +889,16 @@ async function changeSettings(change) {
     if (gender === 'male' || gender === 'female') save.gender = gender;
     // Uložené město („Mělník, Česko“) se znovu nehledá, jen nové.
     const newCity = typeof city === 'string' ? city.trim().slice(0, 80) : '';
-    if (newCity && newCity !== profile().location?.city) {
+    const oldCity = profile().location?.city;
+    if (newCity && newCity !== oldCity) {
       const location = await findCity(newCity).catch(() => null);
       if (!location) return tr('cityNotFound');
       save.location = location;
+    } else if (typeof city === 'string' && !newCity && oldCity) {
+      save.location = null; // smazané město: počasí se přestane ukazovat
     }
     saveSettings(save);
+    if ('location' in save) loadAfterConnecting();
     return null;
   }
   if (change.welcomed === true) {
@@ -1147,6 +1158,7 @@ async function api(req, res, pathname) {
       return true;
     }
     writeEnv(z.connection.env, address);
+    loadAfterConnecting();
     json(res, 200, settingsState());
     return true;
   }
@@ -1158,7 +1170,11 @@ async function api(req, res, pathname) {
       json(res, 400, { error: 'Tenhle zdroj se nekontroluje.', ...settingsState() });
       return true;
     }
-    await z.check({ read: true }).catch((err) => console.error(`Kontrola ${z.id}: ${err.message}`));
+    const problem = await z.check({ read: true }).catch((err) => {
+      console.error(`Kontrola ${z.id}: ${err.message}`);
+      return err.message;
+    });
+    if (!problem && isEnabled(z, loadSettings()) && !currentData().sources?.includes(z.id)) loadAfterConnecting();
     json(res, 200, settingsState());
     return true;
   }

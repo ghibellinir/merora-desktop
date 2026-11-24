@@ -4,6 +4,7 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dateForScreen } from './time.mjs';
+import { language } from './settings.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 // MERI_BRIEF jen na zkoušky: jiné shrnutí, které se smí přepsat (třeba změnami z rozhovoru).
@@ -12,7 +13,7 @@ export const BRIEF = process.env.MERI_BRIEF || join(ROOT, 'data', 'brief.json');
 export const BRIEF_TOMORROW = process.env.MERI_BRIEF
   ? process.env.MERI_BRIEF.replace(/(\.json)?$/, '-tomorrow.json')
   : join(ROOT, 'data', 'brief-tomorrow.json');
-const SAMPLE = join(ROOT, 'data', 'sample.json');
+const SAMPLE = { cs: join(ROOT, 'data', 'sample.json'), en: join(ROOT, 'data', 'sample-en.json') };
 const VIDEO_DATA = join(ROOT, 'data', 'video.json');
 
 export const VIDEO = process.env.MERI_VIDEO === '1' || process.argv.includes('--video');
@@ -67,7 +68,7 @@ export function currentData() {
     data.weather.date = dateForScreen(new Date());
     return data;
   }
-  return readBrief(existsSync(BRIEF) ? BRIEF : SAMPLE);
+  return readBrief(existsSync(BRIEF) ? BRIEF : SAMPLE[language()] ?? SAMPLE.cs);
 }
 
 // Shrnutí zítřka, nebo null, když ještě žádné není (natáčení a zkušební MERI_DATA zítřek nemají).

@@ -665,8 +665,10 @@ export async function collectTomorrow(start) {
     try {
       sourceData.merora = prepareReminders(await loadReminders(), start, { yesterday: false });
     } catch (err) {
-      console.warn(`Merora: ${err.message}`);
-      sourceData.merora = null;
+      if (!err.notConnected) {
+        console.warn(`Merora: ${err.message}`);
+        sourceData.merora = null;
+      }
     }
   }
   Object.assign(sourceData, await collectOnly(['calendar', 'weather'].filter((id) => enabled.has(id)), start));
@@ -675,7 +677,7 @@ export async function collectTomorrow(start) {
     const gmail = fromOldBrief(JSON.parse(readFileSync(BRIEF, 'utf8'))).sourceData?.gmail;
     if (gmail !== undefined) sourceData.gmail = gmail;
   }
-  if (!Object.keys(sourceData).length) throw new Error('Nemáš zapnutý žádný zdroj, ze kterého by šel zítřek udělat.');
+  if (!Object.keys(sourceData).length) throw new Error(tr('nothingConnected'));
   return sourceData;
 }
 

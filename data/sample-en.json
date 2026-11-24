@@ -1,0 +1,158 @@
+{
+  "sample": true,
+  "greeting": "Good morning.",
+  "weather": {
+    "id": "weather",
+    "temperature": "4 °C",
+    "precipitation": "rain 80%"
+  },
+  "today": [
+    {
+      "id": "k1",
+      "icon": "calendar",
+      "tone": "blue",
+      "title": "Team meeting",
+      "time": "9:30",
+      "meta": "calendar"
+    },
+    {
+      "id": "r2",
+      "icon": "bell",
+      "tone": "blue",
+      "title": "Pick up the parcel",
+      "time": "12:00",
+      "meta": "Merora"
+    },
+    {
+      "id": "k2",
+      "icon": "calendar",
+      "tone": "blue",
+      "title": "Dentist",
+      "time": "16:00",
+      "meta": "calendar"
+    },
+    {
+      "id": "r3",
+      "icon": "basket",
+      "tone": "blue",
+      "title": "Get groceries",
+      "time": "17:30",
+      "meta": "when you reach the store"
+    },
+    {
+      "id": "r1",
+      "icon": "phone",
+      "tone": "blue",
+      "title": "Call dad",
+      "time": "18:30",
+      "meta": "Merora"
+    },
+    {
+      "id": "r4",
+      "icon": "repeat",
+      "tone": "blue",
+      "title": "Evening routine",
+      "time": "21:00",
+      "meta": "every day"
+    }
+  ],
+  "tiles": [
+    {
+      "id": "reminders-count",
+      "icon": "bell",
+      "tone": "blue",
+      "title": "Reminders",
+      "value": "4",
+      "caption": "4 left"
+    },
+    {
+      "id": "calendar-count",
+      "icon": "calendar",
+      "tone": "blue",
+      "title": "Calendar",
+      "value": "2",
+      "caption": "Next at 9:30"
+    },
+    {
+      "id": "mails",
+      "icon": "mail",
+      "tone": "blue",
+      "title": "Unread emails",
+      "value": "2",
+      "caption": "Urgent: 1",
+      "captionTone": "fired"
+    }
+  ],
+  "errors": [],
+  "mails": [
+    {
+      "subject": "Can you make it by Friday?",
+      "who": "yesterday 22:14",
+      "label": "Urgent",
+      "tone": "fired"
+    },
+    {
+      "subject": "Meeting up on Saturday?",
+      "who": "yesterday 19:03",
+      "label": "Can wait",
+      "tone": "grey"
+    }
+  ],
+  "sentences": [
+    {
+      "id": "ukazka-rano",
+      "text": "Good morning. This is a sample day, I’ll get yours ready when you ask “How does my day look?”"
+    },
+    {
+      "id": "ukazka-dopoledne",
+      "text": "At half past nine you have a team meeting, and at noon a parcel to pick up.",
+      "highlight": [
+        "k1",
+        "r2"
+      ],
+      "ends": [
+        "n3"
+      ]
+    },
+    {
+      "id": "ukazka-zubar",
+      "text": "At four in the afternoon you have the dentist.",
+      "highlight": [
+        "k2"
+      ],
+      "ends": [
+        "n3"
+      ]
+    },
+    {
+      "id": "ukazka-maily",
+      "text": "You have two unread emails, one of them is urgent.",
+      "highlight": [
+        "mails"
+      ],
+      "ends": [
+        "n2"
+      ]
+    },
+    {
+      "id": "ukazka-pocasi",
+      "text": "It’s four degrees outside and it will almost certainly rain, so take an umbrella.",
+      "highlight": [
+        "weather"
+      ],
+      "ends": [
+        "n2"
+      ]
+    },
+    {
+      "id": "ukazka-vecer",
+      "text": "And at nine in the evening you have your routine.",
+      "highlight": [
+        "r4"
+      ],
+      "ends": [
+        "n4"
+      ]
+    }
+  ]
+}

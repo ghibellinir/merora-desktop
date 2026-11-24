@@ -4,6 +4,7 @@ import { dayOf } from '../time.mjs';
 import { loadEnv } from '../elevenlabs.mjs';
 import { todayEvents } from '../calendar.mjs';
 import { tr } from '../i18n.mjs';
+import { notConnected } from './not-connected.mjs';
 
 export function prepareCalendar(events) {
   return (events ?? []).slice(0, 12).map((u, i) => ({
@@ -41,5 +42,9 @@ export default {
     'Google: Kalendář na webu › Nastavení › tvůj kalendář › Tajná adresa ve formátu iCal. ' +
     'Apple: appka Kalendář › pravým na kalendář › Sdílet kalendář › Veřejný kalendář › zkopírovat odkaz. ' +
     'Outlook: Outlook.com › Nastavení › Kalendář › Sdílené kalendáře › Publikovat kalendář › odkaz ICS.',
-  collect: async ({ now }) => prepareCalendar(await todayEvents(dayOf(now))),
+  collect: async ({ now }) => {
+    const events = await todayEvents(dayOf(now));
+    if (events === null) throw notConnected(tr('calendarMissing'));
+    return prepareCalendar(events);
+  },
 };

@@ -8,8 +8,8 @@
 //   collect({ now, options, askClaude })  vrátí data pro shrnutí, nebo vyhodí chybu
 //   noAI                       sbírá se bez Clauda (kalendář, počasí): obnovuje se zvlášť, zhruba každou čtvrthodinu
 //   fingerprint(data)          co z dat se počítá za změnu (bez fingerprint celá data)
-// Vypnutý zdroj se nesbírá, Meri o něm nemluví a jeho box na obrazovce není. Zdroj, který selže,
-// se jen přeskočí: Meri řekne, že se nenačetl, a v nastavení je u něj „Minule se nenačetl“.
+// Vypnutý nebo nepropojený zdroj (not-connected.mjs) se nesbírá, Meri o něm nemluví a jeho box na obrazovce není.
+// Zdroj, který selže, se jen přeskočí: Meri řekne, že se nenačetl, a v nastavení je u něj „Minule se nenačetl“.
 //
 // Jádro (Merora Desktop) má Meroru, kalendář, počasí a Gmail. Další zdroje jsou doplňky (Merora DEV):
 // moduly ve složce dev/sources vedle jádra (nebo v MERORA_ADDONS), které navíc říkají, co z nich dostane
@@ -69,7 +69,7 @@ export function toggleSource(id, enabled, settings = loadSettings()) {
 
 // Ze kterého zdroje je box ve shrnutí. Boxy doplňků to mají v poli zdroj. Řádky „dnes“ jádra: r… Merora,
 // k… kalendář. Zbytek podle id boxu, i u starších shrnutí a natáčení (chyby a merora tam byly z doplňků).
-const BOX_SOURCE = { mails: 'gmail', weather: 'weather', chyby: 'sentry', merora: 'posthog' };
+const BOX_SOURCE = { mails: 'gmail', weather: 'weather', 'reminders-count': 'merora', 'calendar-count': 'calendar', chyby: 'sentry', merora: 'posthog' };
 const boxSource = (box) => box.source ?? (/^r\d+$/.test(box.id) ? 'merora' : /^k\d+$/.test(box.id) ? 'calendar' : BOX_SOURCE[box.id]);
 
 // Shrnutí jen se zdroji zapnutými teď: odškrtnutý zdroj zmizí z okna hned, ne až po dalším sběru.
@@ -92,7 +92,7 @@ export function bySettings(data, settings = loadSettings()) {
 }
 
 // Posbírá zapnuté zdroje najednou. Výsledek: { [id]: data, nebo null, když zdroj selhal }.
-// Vypnutý zdroj ve výsledku vůbec není. Když selžou všechny, shrnutí nemá z čeho vzniknout.
+// Vypnutý a nepropojený zdroj ve výsledku vůbec není. Když selžou všechny, shrnutí nemá z čeho vzniknout.
 // onSource(id, data): zdroj je hotový (třeba maily, ať okno ukáže jejich dlaždici dřív než celé shrnutí).
 export async function collectSources(now = new Date(), settings = loadSettings(), { onSource = null } = {}) {
   const enabledOnes = enabledSources(settings);
@@ -114,11 +114,13 @@ export async function collectSources(now = new Date(), settings = loadSettings()
       sourceData[z.id] = v.value;
       return;
     }
+    if (v.reason?.notConnected) return;
     console.warn(`${z.title}: ${v.reason?.message}`);
     sourceData[z.id] = null;
   });
+  if (!Object.keys(sourceData).length) throw new Error(tr('nothingConnected'));
   if (Object.values(sourceData).every((v) => v === null)) {
-    throw new Error(tr('noSourceLoaded', { names: enabledOnes.map((z) => z.title).join(', ') }));
+    throw new Error(tr('noSourceLoaded', { names: enabledOnes.filter((z) => z.id in sourceData).map((z) => z.title).join(', ') }));
   }
   return sourceData;
 }
@@ -131,6 +133,7 @@ export async function collectOnly(ids, now = new Date(), settings = loadSettings
   const sourceData = {};
   selected.forEach((z, i) => {
     const v = results[i];
+    if (v.reason?.notConnected) return;
     if (v.status === 'rejected') console.warn(`${z.title}: ${v.reason?.message}`);
     sourceData[z.id] = v.status === 'fulfilled' ? v.value : null;
   });

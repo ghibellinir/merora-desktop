@@ -32,30 +32,47 @@
       "meta": "kalendář"
     },
     {
+      "id": "r3",
+      "icon": "basket",
+      "tone": "blue",
+      "title": "Nakoupit",
+      "time": "17:30",
+      "meta": "až dorazíš do obchodu"
+    },
+    {
+      "id": "r1",
+      "icon": "phone",
+      "tone": "blue",
+      "title": "Zavolat tátovi",
+      "time": "18:30",
+      "meta": "Merora"
+    },
+    {
       "id": "r4",
       "icon": "repeat",
       "tone": "blue",
       "title": "Večerní rutina",
       "time": "21:00",
       "meta": "každý den"
-    },
-    {
-      "id": "r1",
-      "icon": "phone",
-      "tone": "fired",
-      "title": "Zavolat tátovi",
-      "time": "včera 18:00",
-      "meta": "zazvonilo 2×"
-    },
-    {
-      "id": "r3",
-      "icon": "basket",
-      "tone": "blue",
-      "title": "Nakoupit",
-      "meta": "až dorazíš do obchodu"
     }
   ],
   "tiles": [
+    {
+      "id": "reminders-count",
+      "icon": "bell",
+      "tone": "blue",
+      "title": "Připomínky",
+      "value": "4",
+      "caption": "Zbývá 4"
+    },
+    {
+      "id": "calendar-count",
+      "icon": "calendar",
+      "tone": "blue",
+      "title": "Kalendář",
+      "value": "2",
+      "caption": "Další v 9:30"
+    },
     {
       "id": "mails",
       "icon": "mail",
@@ -64,14 +81,6 @@
       "value": "2",
       "caption": "Spěchá: 1",
       "captionTone": "fired"
-    },
-    {
-      "id": "program",
-      "icon": "calendar",
-      "tone": "blue",
-      "title": "Dnes na programu",
-      "value": "6",
-      "caption": "Věcí k vyřízení"
     }
   ],
   "errors": [],

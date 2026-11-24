@@ -10,6 +10,7 @@ import { callContent, withTool, listConnectors } from '../ai.mjs';
 import { timeOf, dateParts, weekdayName, daysAgo, pastWhenForScreen, dayOf } from '../time.mjs';
 import { rulesForModel, ownRules, language } from '../settings.mjs';
 import { tr } from '../i18n.mjs';
+import { notConnected } from './not-connected.mjs';
 
 // Co člověk vidí v Gmailu v Primární, bez reklam a newsletterů (22. 11.). Přes konektor to jde jen přibližně:
 // operátor category:primary nenajde nic a Gmail na webu dává do Primární i maily, které mají přes API štítek
@@ -192,7 +193,13 @@ export default {
   // a roztřídí se jen vlákno, které je nové nebo v něm přibyla zpráva (paměť readCache/writeCache).
   async collect({ now, options }) {
     // Jméno konektoru si každý volí sám, hledá se podle adresy.
-    const prefix = knownPrefix ?? readCacheFile().prefix ?? (await gmailConnector())?.prefix ?? 'mcp__claude_ai_Gmail__';
+    let prefix = knownPrefix ?? readCacheFile().prefix;
+    if (!prefix) {
+      const connector = await gmailConnector();
+      if (!connector) throw notConnected(tr('gmailConnect'));
+      if (connector.status === 'needs_login') throw notConnected(tr('gmailLogin'));
+      prefix = connector.prefix;
+    }
     const find = `${prefix}search_threads`;
     const thread = `${prefix}get_thread`;
     const ads = wantsAds();

@@ -4,9 +4,9 @@
 //   npm run hotkey [-- --uninstall]      jen klávesa pro mikrofon odkudkoli (Mac ⌥M, Windows Alt+M)
 // Mac: služby launchd v ~/Library/LaunchAgents. Windows: skripty ve složce Po spuštění, bez okna a bez práv správce.
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { claudePath } from './ai.mjs';
 
@@ -18,6 +18,8 @@ const MERI_URL = `http://127.0.0.1:${PORT}/app?app=1`;
 const MAC = process.platform === 'darwin';
 const WIN = process.platform === 'win32';
 const disable = process.argv.includes('--uninstall');
+// Node z Homebrew: cesta s verzí (Cellar) po jeho aktualizaci zmizí a služba by nenaběhla, odkaz v bin zůstává.
+const NODE = ['/opt/homebrew/bin/node', '/usr/local/bin/node'].find((p) => existsSync(p) && realpathSync(p) === process.execPath) ?? process.execPath;
 
 const matches = async () => {
   try {
@@ -118,10 +120,17 @@ async function background() {
       return console.log('Server Merora Desktop už na pozadí neběží. Ručně ho pustíš příkazem npm start.');
     }
     stopManualServer();
-    // Vedle Node je i claude, který ranní sběr potřebuje. Launchd jinak dává jen systémovou PATH.
-    const route = [join(process.execPath, '..'), '/usr/local/bin', '/opt/homebrew/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin'].join(':');
+    // Claude je vedle Node (npm), nebo tam, kde ho našla instalace (nativní v ~/.local/bin), a npm verze potřebuje
+    // i Node. Launchd jinak dává jen systémovou PATH.
+    const claude = claudePath();
+    const route = [
+      dirname(NODE),
+      ...(isAbsolute(claude) ? [dirname(claude)] : []),
+      join(homedir(), '.local', 'bin'),
+      '/usr/local/bin', '/opt/homebrew/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin',
+    ].filter((d, i, all) => all.indexOf(d) === i).join(':');
     await launchdStart('app.merora.meri', {
-      program: [process.execPath, join(ROOT, 'server.mjs')],
+      program: [NODE, join(ROOT, 'server.mjs')],
       workDir: ROOT,
       environment: { PATH: route },
       log: join(MERI, 'server.log'),

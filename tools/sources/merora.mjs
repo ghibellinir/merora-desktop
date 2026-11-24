@@ -6,6 +6,7 @@ import { timeOf, dayOf, pastWhenForScreen } from '../time.mjs';
 import { hasOAuth, fetchReminders, directAvailable } from '../merora.mjs';
 import { showYesterday, ownRules } from '../settings.mjs';
 import { tr } from '../i18n.mjs';
+import { notConnected } from './not-connected.mjs';
 
 export const MERORA_MCP = 'https://hvormybwggtfgiohmidh.supabase.co/functions/v1/mcp';
 
@@ -58,7 +59,7 @@ export function fromConnector({ reminders = [] }) {
 export async function load() {
   if (directAvailable()) return fetchReminders();
   const connector = await meroraConnector();
-  if (!connector) throw new Error(tr('meroraNotInClaude'));
+  if (!connector) throw notConnected(tr('meroraNotInClaude'));
   return fromConnector(await callTool({ tool: `${connector.prefix}list_reminders`, extraArgs: { view: 'all', limit: 200 } }));
 }
 

@@ -3,22 +3,26 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 
 const WORK_DIR = join(homedir(), '.meri'); // mimo repa, ať se nenačítají cizí instrukce
 
-// Kde je Claude Code. Na Macu a Linuxu stačí „claude“ z PATH. Na Windows se hledá claude.exe (nativní
-// instalace v %USERPROFILE%\\.local\\bin, nebo balíček z npm), protože claude.cmd z npm Node bez shellu
-// spustit nesmí a se shellem by se rozbily uvozovky v argumentech.
+// Kde je Claude Code. Nejdřív PATH, pak místa, kam ho dávají instalátory: server na pozadí má jen PATH od
+// launchd (tools/install.mjs) a nativní instalace dává Clauda do ~/.local/bin, které v ní být nemusí.
+// Na Windows se hledá claude.exe (nativní instalace v %USERPROFILE%\\.local\\bin, nebo balíček z npm), protože
+// claude.cmd z npm Node bez shellu spustit nesmí a se shellem by se rozbily uvozovky v argumentech.
 export function claudePath() {
   if (process.env.MERI_CLAUDE) return process.env.MERI_CLAUDE;
-  if (process.platform !== 'win32') return 'claude';
+  const win = process.platform === 'win32';
+  const name = win ? 'claude.exe' : 'claude';
   const candidates = [
-    ...(process.env.PATH ?? '').split(';').filter(Boolean).map((d) => join(d, 'claude.exe')),
-    join(homedir(), '.local', 'bin', 'claude.exe'),
-    join(process.env.APPDATA ?? '', 'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe'),
+    ...(process.env.PATH ?? '').split(delimiter).filter(Boolean).map((d) => join(d, name)),
+    join(homedir(), '.local', 'bin', name),
+    ...(win
+      ? [join(process.env.APPDATA ?? '', 'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', name)]
+      : [join(homedir(), '.claude', 'local', name), '/opt/homebrew/bin/claude', '/usr/local/bin/claude']),
   ];
-  return candidates.find((k) => existsSync(k)) ?? 'claude.exe';
+  return candidates.find((k) => existsSync(k)) ?? name;
 }
 
 // Rozhovor: jeden proces běží pořád, takže další věta neplatí rozběh a pamatuje si, co zaznělo.
@@ -178,8 +182,10 @@ function loadConnectors(limitMs = 60_000) {
       clearTimeout(timer);
       failed(new Error(`Claude nejde spustit: ${err.message}`));
     });
-    p.on('close', () => {
+    p.on('close', (code) => {
       clearTimeout(timer);
+      // Prázdný výpis s chybou není „nic propojeného“ (nepropojený zdroj se jen vynechá).
+      if (code !== 0 && !output.trim()) return failed(new Error('Claude nevypsal konektory.'));
       const connectors = [];
       for (const line of output.split(/\r?\n/)) {
         const m = line.match(/^(.+?): (\S+).* - (.+)$/);

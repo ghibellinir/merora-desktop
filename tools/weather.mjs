@@ -18,10 +18,16 @@ function description(code) {
   return tr('storm');
 }
 
-export async function weather() {
-  // Město z nastavení (úvod nebo „O tobě“), jinak MERI_WEATHER=šířka,délka v .env, jinak Praha.
+// Odkud brát počasí: město z nastavení (úvod nebo „O tobě“), jinak MERI_WEATHER=šířka,délka v .env, jinak null.
+export function place() {
   const location = profile().location;
-  const [latitude, longitude] = location ? [location.latitude, location.longitude] : (loadEnv().MERI_WEATHER || '50.08,14.44').split(',');
+  if (location) return [location.latitude, location.longitude];
+  const env = loadEnv().MERI_WEATHER;
+  return env ? env.split(',') : null;
+}
+
+export async function weather() {
+  const [latitude, longitude] = place();
   const q = new URLSearchParams({
     latitude,
     longitude,

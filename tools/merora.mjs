@@ -35,6 +35,9 @@ const APP_CONFIG = join(ROOT, '..', 'merora-app', 'dory-mobile', 'lib', 'config.
 // z Merory (tools/realtime.mjs), k připomínkám pustí až token OAuth. MERORA_PUBLISHABLE_KEY jen na zkoušky.
 const PUBLISHABLE_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh2b3JteWJ3Z2d0Zmdpb2htaWRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0MzA3MzcsImV4cCI6MjA4MDAwNjczN30.Sdzs1xU_A8TrcMga6FP-eXtStyHxAV-PoQ51TU_shTg';
+// Funkce Merory má běžet u databáze v Irsku. Bez hlavičky běží nejblíž tomu, kdo volá (z Prahy ve Frankfurtu, z USA
+// za oceánem), a každé její spojení do databáze pak trvá déle. Stejnou hlavičku posílá appka i konektor.
+const REGION = 'eu-west-1';
 function settings() {
   const configSource = existsSync(APP_CONFIG) ? readFileSync(APP_CONFIG, 'utf8') : '';
   const z = (name) => configSource.match(new RegExp(`export const ${name} = "([^"]+)"`))?.[1];
@@ -42,6 +45,7 @@ function settings() {
   return {
     supabase,
     backend: process.env.MERORA_BACKEND_URL || `${supabase}/functions/v1/main`,
+    region: process.env.MERORA_BACKEND_URL || process.env.MERORA_SUPABASE_URL ? null : REGION,
     api: z('MERORA_API_VERSION') ?? '7',
     publishable: process.env.MERORA_PUBLISHABLE_KEY || z('SUPABASE_ANON_KEY') || PUBLISHABLE_KEY,
   };
@@ -200,11 +204,16 @@ async function request(method, route, body) {
 }
 
 async function callIt(method, route, body) {
-  const { backend, api } = settings();
+  const { backend, api, region } = settings();
   const res = await fetch(`${backend}${route}`, {
     method: method,
     signal: AbortSignal.timeout(30_000),
-    headers: { Authorization: `Bearer ${await accessToken()}`, 'X-Merora-Api': api, 'Content-Type': 'application/json' },
+    headers: {
+      Authorization: `Bearer ${await accessToken()}`,
+      'X-Merora-Api': api,
+      'Content-Type': 'application/json',
+      ...(region ? { 'x-region': region } : {}),
+    },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   // Smazání vrací prázdnou odpověď.
