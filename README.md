@@ -73,7 +73,7 @@ V plánu dne jsou připomínky (i s místem) a události s časem na ten den, ce
 
 Na otázky typu „co mě čeká zítra“ odpovídá z Merory i z kalendáře na dnešek a dalších 7 dní (kalendář se pro rozhovor stahuje nejvýš jednou za čtvrthodinu).
 
-- **odpovědět na otázku k připomínkám a ke shrnutí:** „co mám zítra?“, „kdy mám zubaře?“, „co jsem včera udělal?“, „jaké je počasí?“, „kolik bylo chyb?“. Meri vidí všechny otevřené připomínky na kterýkoli den a posledních sto hotových;
+- **odpovědět na otázku k připomínkám a ke shrnutí:** „co mám zítra?“, „kdy mám zubaře?“, „co jsem včera udělal?“, „jaké je počasí?“, „kolik bylo chyb?“. Meri vidí všechny otevřené připomínky na kterýkoli den a posledních padesát hotových;
 - **říct víc o mailech:** „a co ty ostatní?“, „od koho je ten o Androidu?“, „co píše Dropbox?“, ze všech nepřečtených, které Meri ráno prošla;
 - **přesunout připomínku:** „přesuň mi natáčení na třetí hodinu“, „vrať to“;
 - **založit novou připomínku:** „připomeň mi zítra v devět zavolat mámě“, „vrať to“ ji zase smaže;

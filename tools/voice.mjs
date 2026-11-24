@@ -58,15 +58,26 @@ export function isVoiced(voiceId, data = currentData()) {
   return data.sentences.every((v) => texts[v.id] === (v.spoken ?? v.text));
 }
 
+// Odpovědi z rozhovoru (o-) se chvíli drží, protože se opakují a platí se jen jednou. Po 14 dnech pryč,
+// ve složkách všech hlasů: po přepnutí jazyka mluví jiný hlas a jeho složka se jinak neuklidí.
+function removeOldAnswers() {
+  const before14Days = Date.now() - 14 * 86_400_000;
+  for (const folder of readdirSync(OUT, { withFileTypes: true })) {
+    if (!folder.isDirectory()) continue;
+    for (const file of readdirSync(join(OUT, folder.name))) {
+      const path = join(OUT, folder.name, file);
+      if (file.startsWith('o-') && statSync(path).mtimeMs < before14Days) rmSync(path);
+    }
+  }
+}
+
 // Po novém shrnutí pryč se starými větami. Ukázkové věty a pozdrav zůstávají.
 export function cleanUp(voiceId, data) {
   const folder = join(OUT, voiceId);
   const valid = new Set(data.sentences.map((v) => `${v.id}.wav`));
   const texts = loadTexts(voiceId);
-  const before14Days = Date.now() - 14 * 86_400_000;
+  removeOldAnswers();
   for (const file of readdirSync(folder)) {
-    // Odpovědi z rozhovoru se chvíli drží, protože se opakují a platí se jen jednou.
-    if (file.startsWith('o-') && statSync(join(folder, file)).mtimeMs < before14Days) rmSync(join(folder, file));
     if (!file.startsWith('v-') || valid.has(file)) continue;
     rmSync(join(folder, file));
     delete texts[file.replace(/\.wav$/, '')];
