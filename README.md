@@ -67,7 +67,7 @@ Zvuk i poslech běží i v okně schovaném za jinou aplikací. Když máš Mero
 
 V hlavičce okna vedle data je přepínač **Dnes / Zítra**. Zítra ukáže připomínky a události na zítřek, předpověď počasí a co z mailů spěchá. Plán zítřka je po přepnutí hned, co Meri řekne, se chystá na pozadí (asi 20 s). Meri sama nemluví: shrnutí pustí mezerník. Zítřek se pak obnovuje jako dnešek (ručně nebo podle intervalu), Merora, kalendář a počasí živě. V nastavení (Shrnutí) jde zapnout **Chystat i zítřek předem** a **Mluvit o počasí**. Nové okno začíná dneškem.
 
-V plánu dne jsou připomínky (i s místem) a události s časem na ten den, celodenní a volitelně včerejší nedodělané. Kdykoli, připomínky jen s místem, prázdné seznamy a rutiny bez času v plánu dne nejsou, ledaže si věc z Kdykoli přeješ vlastním pravidlem v nastavení („Cvičení mi zobrazuj každý den, i když ho mám v Kdykoli“). Nahoře jsou dlaždice Připomínky, Kalendář a Maily (s doplňky nejvýš 5), co se načítá, má kolečko.
+V plánu dne jsou připomínky (i s místem) a události s časem na ten den, celodenní a volitelně včerejší nedodělané. Kdykoli, připomínky jen s místem, prázdné seznamy a rutiny bez času v plánu dne nejsou, ledaže si věc z Kdykoli přeješ vlastním pravidlem v nastavení („Cvičení mi zobrazuj každý den, i když ho mám v Kdykoli“). Nahoře jsou dlaždice Připomínky, Kalendář a Maily (s doplňky nejvýš 5), co se načítá, má kolečko. Nový den má v okně hned svoje datum, připomínky, kalendář a počasí do pár vteřin, maily a doplňky s kolečkem, dokud nepřijdou. Včerejšek se v něm neukáže.
 
 ### Co Meri umí v rozhovoru
 

@@ -3,8 +3,9 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { dateForScreen } from './time.mjs';
+import { dateForScreen, dayOf } from './time.mjs';
 import { language } from './settings.mjs';
+import { isForDay, pendingDay } from './pending.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 // MERI_BRIEF jen na zkoušky: jiné shrnutí, které se smí přepsat (třeba změnami z rozhovoru).
@@ -58,6 +59,12 @@ function convert(value, key) {
 }
 export const fromOldBrief = (brief) => (brief && ('vety' in brief || 'dnes' in brief) ? convert(brief, null) : brief);
 const readBrief = (file) => fromOldBrief(JSON.parse(readFileSync(file, 'utf8')));
+// Uložené shrnutí dneška. Když je z jiného dne, jeho obsah neplatí: vrátí se dnešek, který se teprve načítá.
+function readToday() {
+  const brief = readBrief(BRIEF);
+  const now = new Date();
+  return brief.sample || isForDay(brief, dayOf(now)) ? brief : pendingDay(brief, now);
+}
 
 export function currentData() {
   // Jen na zkoušky okna: jiný soubor se shrnutím, třeba s vypnutými zdroji.
@@ -68,7 +75,7 @@ export function currentData() {
     data.weather.date = dateForScreen(new Date());
     return data;
   }
-  return readBrief(existsSync(BRIEF) ? BRIEF : SAMPLE[language()] ?? SAMPLE.cs);
+  return existsSync(BRIEF) ? readToday() : readBrief(SAMPLE[language()] ?? SAMPLE.cs);
 }
 
 // Shrnutí zítřka, nebo null, když ještě žádné není (natáčení a zkušební MERI_DATA zítřek nemají).
@@ -100,7 +107,7 @@ export function updateTomorrowBrief(change) {
 // Přes vlastní dočasný soubor, ať se nepotká se sběrem (tools/brief.mjs píše přes .new).
 export function updateBrief(change) {
   if (VIDEO || process.env.MERI_DATA || !existsSync(BRIEF)) return null;
-  const fresh = change(readBrief(BRIEF));
+  const fresh = change(readToday());
   if (!fresh) return null;
   const tempFile = `${BRIEF}.update`;
   writeFileSync(tempFile, `${JSON.stringify(fresh, null, 2)}\n`);

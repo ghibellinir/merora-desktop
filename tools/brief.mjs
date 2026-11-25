@@ -12,6 +12,7 @@ import { askClaude } from './ai.mjs';
 import { tr } from './i18n.mjs';
 import { timeOf, dateForScreen, weekdayName, daysAgo, greeting, dayOf, dateParts } from './time.mjs';
 import { BRIEF, BRIEF_TOMORROW, fromOldBrief } from './data.mjs';
+import { isForDay } from './pending.mjs';
 import { load as loadReminders, prepareReminders } from './sources/merora.mjs';
 import { directAvailable } from './merora.mjs';
 import { BRIEF_LENGTHS, getBriefLength, meroraLive, loadSettings, rulesForModel, profile, shouldMentionRings, shouldMentionWeather, forms, language } from './settings.mjs';
@@ -674,7 +675,9 @@ export async function collectTomorrow(start) {
   Object.assign(sourceData, await collectOnly(['calendar', 'weather'].filter((id) => enabled.has(id)), start));
   if ('weather' in sourceData) sourceData.weather = weatherTomorrow(sourceData.weather);
   if (enabled.has('gmail') && existsSync(BRIEF)) {
-    const gmail = fromOldBrief(JSON.parse(readFileSync(BRIEF, 'utf8'))).sourceData?.gmail;
+    const brief = fromOldBrief(JSON.parse(readFileSync(BRIEF, 'utf8')));
+    // Jen maily z dnešního načtení. Z včerejšího shrnutí by na zítřek tvrdily, co už neplatí.
+    const gmail = isForDay(brief, dayOf(new Date())) ? brief.sourceData?.gmail : undefined;
     if (gmail !== undefined) sourceData.gmail = gmail;
   }
   if (!Object.keys(sourceData).length) throw new Error(tr('nothingConnected'));
@@ -687,6 +690,7 @@ export async function collectTomorrow(start) {
 async function savedData(now) {
   const original = fromOldBrief(JSON.parse(readFileSync(BRIEF, 'utf8')));
   if (!original.sourceData) throw new Error('Shrnutí nemá uložená data zdrojů, načti nová.');
+  if (!isForDay(original, dayOf(now))) throw new Error('Uložené shrnutí je z jiného dne, načti nová data.');
   const enabledOnes = new Set(enabledSources().map((z) => z.id));
   const sourceData = Object.fromEntries(Object.entries(original.sourceData).filter(([id]) => enabledOnes.has(id)));
   if (!Object.keys(sourceData).length) throw new Error('Žádný zapnutý zdroj nemá uložená data, načti nová.');

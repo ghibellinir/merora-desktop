@@ -38,8 +38,9 @@ const line = (k, page = 0) => `
   </article>
   </div>`;
 
+// loading: den se teprve načítá a tahle dlaždice ještě nemá data (tools/pending.mjs).
 const statTile = (d) => `
-  <article class="cd stat-tile" data-card="${esc(d.id)}">
+  <article class="cd stat-tile${d.loading ? ' loading' : ''}" data-card="${esc(d.id)}"${d.loading ? ' data-waiting' : ''}>
     <div class="header">
       <div class="tile ${esc(d.tone)}">${icon(d.icon, 22)}</div>
       <div class="title">${esc(d.title)}</div>
@@ -71,9 +72,12 @@ const panelsOf = (data) => [
   hasSource(data, 'gmail') && data.mails.length &&
     panel('mails', 'mail', `${data.mailsHeading ?? t('importantMails')}${data.importantMails > data.mails.length ? ` · ${t('mailsOf', { shown: data.mails.length, total: data.importantMails })}` : ''}`, data.mails.map((m) =>
       item(m.subject, `<span>${esc(m.who)}</span><span class="label ${esc(m.tone)}">${esc(m.label)}</span>`))),
+  // Maily dneška se teprve načítají: panel má místo včerejších mailů kolečko.
+  hasSource(data, 'gmail') && data.day !== 'tomorrow' && data.pending?.includes('gmail') &&
+    panel('mails', 'mail', data.mailsHeading ?? t('importantMails'), [`<div class="loading-note"><span class="spinner"></span>${t('loading')}</div>`]),
 ].filter(Boolean);
 const clock = () => new Date().toLocaleTimeString(locale(), { hour: 'numeric', minute: '2-digit' });
-const weatherContent = (p) => `
+const weatherContent = (p) => p.loading ? `<span class="spinner" role="status" aria-label="${t('loading')}"></span>` : `
           ${icon(p.precipitation ? 'rain' : 'cloud', 32)}
           <span class="temperature">${esc(p.temperature)}</span>
           ${p.precipitation ? `<span class="precipitation">${esc(p.precipitation)}</span>` : ''}`;
@@ -90,8 +94,14 @@ const pageDots = (n) =>
   n < 2
     ? ''
     : `<nav class="pages r" aria-label="${t('pages')}">${Array.from({ length: n }, (_, i) => `<button type="button" class="dot" data-page-go="${i}" aria-label="${t('pageN', { n: i + 1 })}"></button>`).join('')}</nav>`;
-const todayHtml = (lines) =>
-  lines.length ? lines.map((k, i) => line(k, Math.floor(i / PAGE_SIZE))).join('') + pageDots(pagesOf(lines)) : `<p class="empty r">${emptyText()}</p>`;
+// Prázdný box řekne „Na dnešek nic nemáš.“ až tehdy, když jsou připomínky i kalendář načtené.
+const waitsForLines = (pending) => Boolean(pending?.some((id) => id === 'merora' || id === 'calendar'));
+// Když se připomínky nebo kalendář nenačetly, „nic nemáš“ by nebyla pravda.
+const linesFailed = (failed) => Boolean(failed?.some((id) => id === 'merora' || id === 'calendar'));
+const todayHtml = (lines, pending, failed) =>
+  lines.length
+    ? lines.map((k, i) => line(k, Math.floor(i / PAGE_SIZE))).join('') + pageDots(pagesOf(lines))
+    : `<p class="empty r">${waitsForLines(pending) ? `<span class="spinner"></span>${t('loading')}` : linesFailed(failed) ? t('emptyFailed') : emptyText()}</p>`;
 
 function todayDate() {
   const d = new Date();
@@ -109,7 +119,7 @@ function rightHtml() {
         <div class="greeting">
           <h1>${esc(data.greeting)}</h1>
           <div class="date-row">
-            <div class="date">${esc(data.weather?.date ?? todayDate())}</div>
+            <div class="date">${esc(data.date ?? data.weather?.date ?? todayDate())}</div>
             <div class="day-switch" id="day-switch" role="group" aria-label="${t('daySwitch')}">
               <button type="button" data-day="today" aria-pressed="${!tomorrow}">${t('today')}</button>
               <button type="button" data-day="tomorrow" aria-pressed="${tomorrow}">${t('tomorrow')}</button>
@@ -124,7 +134,7 @@ function rightHtml() {
         : ''}
       <div class="app-body">
         ${hasToday
-          ? `<section class="app-today" aria-label="${tomorrow ? t('tomorrow') : t('today')}">${todayHtml(data.today)}</section>`
+          ? `<section class="app-today" aria-label="${tomorrow ? t('tomorrow') : t('today')}">${todayHtml(data.today, data.pending, data.failed)}</section>`
           : ''}
         ${panels.length ? `<div class="app-panels r${hasToday ? '' : ' wide'}">${panels.join('')}</div>` : ''}
       </div>`;
@@ -303,17 +313,19 @@ function dialogText(d) {
 // Změny z rozhovoru (přesun, nová, smazaná připomínka) a z Merory mimo rozhovor (třeba nová připomínka
 // v telefonu, kalendář) se ukážou hned v boxu „Dnes“. Stejné řádky ve stejném pořadí se jen přepíšou
 // (řádek, který svítí, svítí dál), jinak se box překreslí. Box z rozhovoru má přednost.
-let linesSignature = JSON.stringify(data.today);
-function showLines(lines) {
+// pending: co se ještě načítá (prázdný box pak točí kolečko), failed: co se nenačetlo.
+const linesKey = (lines, pending, failed) => `${JSON.stringify(lines)}${lines.length ? '' : waitsForLines(pending) ? ' waiting' : linesFailed(failed) ? ' failed' : ''}`;
+let linesSignature = linesKey(data.today, data.pending, data.failed);
+function showLines(lines, pending, failed) {
   if (!lines) return;
-  const signature = JSON.stringify(lines);
+  const signature = linesKey(lines, pending, failed);
   if (signature === linesSignature) return;
   linesSignature = signature;
   const box = stage.querySelector('.app-today');
   if (!box) return;
   const cards = [...box.querySelectorAll('[data-card]')];
   currentLines = lines;
-  if (cards.length === lines.length && lines.every((r, i) => cards[i].dataset.card === r.id)) {
+  if (lines.length && cards.length === lines.length && lines.every((r, i) => cards[i].dataset.card === r.id)) {
     lines.forEach((r, i) => {
       cards[i].querySelector('.tile').className = `tile ${r.tone}`;
       cards[i].querySelector('.title').textContent = r.title;
@@ -321,7 +333,7 @@ function showLines(lines) {
     });
     return;
   }
-  box.innerHTML = todayHtml(lines);
+  box.innerHTML = todayHtml(lines, pending, failed);
   for (const el of box.querySelectorAll('.r')) el.style.opacity = '1';
   shownPage = -1; // nové řádky: stránka se rozdělí znovu
   showPage(lastChoice);
@@ -502,15 +514,15 @@ const FAST_TILES = ['reminders-count', 'calendar-count'];
 // loaded: dlaždice, jejichž data už během načítání dorazila (maily dřív než celé shrnutí).
 function showLoading(loading, loaded = []) {
   const on = loading === (tomorrow ? 'tomorrow' : 'today');
-  for (const el of stage.querySelectorAll('.stat-tile')) el.classList.toggle('loading', on && !FAST_TILES.includes(el.dataset.card) && !loaded.includes(el.dataset.card));
+  for (const el of stage.querySelectorAll('.stat-tile')) el.classList.toggle('loading', 'waiting' in el.dataset || (on && !FAST_TILES.includes(el.dataset.card) && !loaded.includes(el.dataset.card)));
 }
 
 onState((s) => {
   if (reloadForLanguage(s.language)) return; // jazyk přepnutý jinde (jiné okno, nastavení)
   // Živé změny jen pro den, který okno ukazuje: box a dlaždice zítřka se nemíchají s dneškem.
   const mine = (s.linesDay ?? 'today') === (tomorrow ? 'tomorrow' : 'today');
-  if (!tomorrow && s.dialog?.lines) showLines(s.dialog.lines);
-  else if (mine) showLines(s.lines);
+  if (!tomorrow && s.dialog?.lines) showLines(s.dialog.lines, s.pending, s.failed);
+  else if (mine) showLines(s.lines, s.pending, s.failed);
   if (mine) {
     showWeather(s.weather);
     showTiles(s.tiles);
@@ -600,6 +612,8 @@ async function takeNewData() {
   if (reloadForLanguage(assets.data.language ?? 'cs')) return; // jiný jazyk: statické texty se musí složit znovu
   if (assets.voiceList) await voice.load(assets.timeline.cues.map((c) => c.id));
   swapping = true;
+  // Den se jen donačetl (tools/pending.mjs): boxy se vymění na místě, bez nástupu, ať okno neblikne.
+  const calm = Boolean(data.provisional) && data.day === assets.data.day && data.date === assets.data.date;
   ({ data, voiceList, timeline: tl } = assets);
   tomorrow = data.day === 'tomorrow';
   lastTime = createdTime();
@@ -609,8 +623,9 @@ async function takeNewData() {
   sentence = null;
   $('app-right').innerHTML = rightHtml();
   revealed = [...stage.querySelectorAll('.r')];
-  openedAt = performance.now() / 1000;
-  linesSignature = JSON.stringify(data.today);
+  openedAt = calm ? -1e6 : performance.now() / 1000;
+  if (calm) for (const el of revealed) el.style.opacity = '1';
+  linesSignature = linesKey(data.today, data.pending, data.failed);
   tilesSignature = JSON.stringify(data.tiles ?? []);
   weatherSignature = JSON.stringify(data.weather ?? null);
   currentLines = data.today;

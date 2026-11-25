@@ -191,7 +191,18 @@ export default {
   // Výsledek: { pocet, vic (víc vláken, než se vešlo), maily }.
   // Poprvé (prázdná paměť) jedno volání Clauda: hledání, otevření všech vláken a roztřídění. Pak už jen hledání, a otevře
   // a roztřídí se jen vlákno, které je nové nebo v něm přibyla zpráva (paměť readCache/writeCache).
-  async collect({ now, options }) {
+  // Hledání se občas nepovede (25. 11. při otevření okna, proč se nezjistilo), napodruhé obvykle projde. Jméno konektoru se přitom
+  // zjistí znovu, roztříděné maily zůstanou.
+  async collect(args) {
+    try {
+      return await this.collectOnce(args);
+    } catch (err) {
+      if (!err.searchFailed) throw err;
+      console.warn(`Gmail: ${err.message} Zkouším to ještě jednou.`);
+      return this.collectOnce(args, { second: true });
+    }
+  },
+  async collectOnce({ now, options }, { second = false } = {}) {
     // Jméno konektoru si každý volí sám, hledá se podle adresy.
     let prefix = knownPrefix ?? readCacheFile().prefix;
     if (!prefix) {
@@ -223,8 +234,10 @@ export default {
       const v = searchFor(query);
       if (!v || v.error) {
         knownPrefix = null;
-        writeCache(null, {}, null); // jméno konektoru a paměť příště znovu
-        throw new Error(v?.content || tr('gmailSearchFailed'));
+        // Jméno konektoru příště znovu, po druhém nezdaru i paměť.
+        if (second) writeCache(null, {}, null);
+        else writeCache(key, known ?? {}, null);
+        throw Object.assign(new Error(v?.content || tr('gmailSearchFailed')), { searchFailed: true });
       }
       results[name] = callContent(v);
     }

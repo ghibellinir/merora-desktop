@@ -1,6 +1,6 @@
 {
   "name": "merora-desktop",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "description": "Merora na počítači: ranní shrnutí a rozhovor s Meri.",

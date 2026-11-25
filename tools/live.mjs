@@ -3,7 +3,7 @@
 // počasí se podle nich přepíšou a okno je přepíše na místě. Věty zůstávají, jak jsou: přepíšou se až ve
 // chvíli, kdy si shrnutí někdo pustí (sentencesStale, tools/brief.mjs --sentences), ať se za hlas platí jen to,
 // co opravdu zazní.
-import { safeTitle, isSpeakable, weatherForScreen, withDayTiles, mailBoxes } from './brief.mjs';
+import { safeTitle, isSpeakable, weatherForScreen, withDayTiles, mailBoxes, composeBrief } from './brief.mjs';
 import { shorten, sortLines, insertLine } from './lines.mjs';
 import { tr } from './i18n.mjs';
 import { fingerprintForSentences, sourceFingerprint } from './sources/index.mjs';
@@ -96,10 +96,45 @@ function byTime(brief, id, data, now) {
   return { ...brief, sourceData, today, tiles };
 }
 
+// Den, který se teprve načítá (tools/pending.mjs), dostal data dalšího zdroje: složí se znovu z toho, co už je, a co
+// ještě není, má dál kolečko. data null: zdroj se nenačetl. data undefined: zdroj už propojený není, z okna zmizí.
+const CORE_TILE = { merora: 'reminders-count', calendar: 'calendar-count', gmail: 'mails' };
+export function fillPending(brief, id, data, now = new Date()) {
+  const tomorrow = brief.day === 'tomorrow';
+  const pending = brief.pending.filter((x) => x !== id);
+  if (data === undefined) {
+    return {
+      ...brief,
+      pending,
+      sources: brief.sources.filter((x) => x !== id),
+      tiles: brief.tiles.filter((d) => d.id !== CORE_TILE[id] && d.source !== id),
+      weather: id === 'weather' ? null : brief.weather,
+    };
+  }
+  const sourceData = { ...brief.sourceData, [id]: data };
+  const fresh = composeBrief({ today: [], mails: [], sentences: [] }, sourceData, now, { tomorrow });
+  return {
+    ...brief,
+    ...fresh,
+    createdAt: new Date().toISOString(),
+    sources: brief.sources,
+    // Řádky skládá jen Merora a kalendář: maily a doplňky nesmí vrátit, co se mezitím změnilo v rozhovoru.
+    today: MATCHING[id] ? fresh.today : brief.today,
+    weather: fresh.weather ?? brief.weather,
+    tiles: brief.tiles.map((d) => fresh.tiles.find((x) => x.id === d.id) ?? d),
+    mailsHeading: fresh.mailsHeading ?? brief.mailsHeading,
+    sourceData,
+    sentencesFingerprint: null,
+    provisional: true,
+    pending,
+  };
+}
+
 // Shrnutí s novými daty jednoho zdroje (merora, kalendar, pocasi), nebo null, když se nic nezměnilo.
 // Zdroj, který ve shrnutí není (byl vypnutý, když vznikalo), počká na další načtení všech dat.
 export function rewriteSource(brief, id, data, now = new Date()) {
   if (brief.sample || !(brief.sources ?? []).includes(id)) return null;
+  if (brief.pending?.includes(id)) return fillPending(brief, id, data, now);
   if (id === 'gmail') return mailsForTomorrow(brief, data, now);
   const old = brief.sourceData?.[id];
   if (brief.sourceData && sourceFingerprint(id, old) === sourceFingerprint(id, data)) return byTime(brief, id, data, now);

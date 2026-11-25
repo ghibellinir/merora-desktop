@@ -9,7 +9,7 @@ import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { askClaude } from './tools/ai.mjs';
 import { VIDEO, currentData, tomorrowData, updateBrief, updateTomorrowBrief, writeTomorrowBrief } from './tools/data.mjs';
-import { dayOf } from './tools/time.mjs';
+import { dateForScreen, dayOf } from './tools/time.mjs';
 import { tomorrowStart, weatherTomorrow, collectTomorrow, composeBrief, mailBoxes } from './tools/brief.mjs';
 import { Dialog, wantsRepeat, asksAboutDay } from './tools/dialog.mjs';
 import { TAIL, buildTimeline } from './public/timeline.js';
@@ -28,7 +28,8 @@ import {
 import { findCity } from './tools/weather.mjs';
 import { SOURCES, isEnabled, fingerprintForSentences, bySettings, toggleSource, collectOnly, sourceOptions } from './tools/sources/index.mjs';
 import { MERORA_MCP, prepareReminders } from './tools/sources/merora.mjs';
-import { rewriteSource, sentencesStale } from './tools/live.mjs';
+import { fillPending, rewriteSource, sentencesStale } from './tools/live.mjs';
+import { pendingDay, waitingMails } from './tools/pending.mjs';
 import { checkForUpdate, updateInfo, applyUpdate, currentVersion } from './tools/update.mjs';
 import { tr } from './tools/i18n.mjs';
 
@@ -73,6 +74,8 @@ const ROUTES = {
 let state = {
   mode: 'idle', startAt: 0, gen: 0, rev: 0, label: null, preparing: null, dialog: null,
   voice: voiceEnabled(), mic: false, refreshing: false, video: VIDEO, lines: null, weather: null, phone: null,
+  pending: null, // zdroje, které se u dne v lines ještě načítají (tools/pending.mjs)
+  failed: null, // zdroje, které se u dne v lines nenačetly
   day: 'today', // přepínač Dnes / Zítra v okně
   // Aktualizace (tools/update.mjs): verze běžícího serveru (okno se po aktualizaci podle ní načte znovu),
   // update: novější vydání na GitHubu, nebo null; updating: právě se aktualizuje; updateError: proč se nepovedla.
@@ -95,8 +98,10 @@ function tomorrowExpired(t = tomorrowData()) {
   const hours = getRefreshHours();
   return tomorrowLoaded(t) && Boolean(hours) && Date.now() - new Date(t.createdAt).getTime() >= hours * 3600_000;
 }
-// Co okno teď ukazuje a Meri říká. Zítřek, který ještě není, ukáže dnešek, než se načte.
-const shownData = () => (state.day === 'tomorrow' ? tomorrowData() ?? currentData() : currentData());
+// Co okno teď ukazuje a Meri říká. Den, který se teprve načítá, má hned svoje datum a kolečka (tools/pending.mjs),
+// nikdy data jiného dne (Riccardo 25. 11.): dnešek to má v currentData, zítřek tady.
+const shownTomorrow = () => (tomorrowLoaded() ? tomorrowData() : VIDEO || process.env.MERI_DATA ? currentData() : pendingDay(currentData(), tomorrowStart(), { tomorrow: true }));
+const shownData = () => (state.day === 'tomorrow' ? shownTomorrow() : currentData());
 let collectionDay = 'today'; // pro který den běží sběr
 
 // Zítřek po prvním přepnutí (nebo předem): data bez AI (Merora, kalendář, počasí, maily z dneška) jsou v boxu do
@@ -111,13 +116,23 @@ function loadTomorrow({ sentences = true } = {}) {
         const start = tomorrowStart();
         const sourceData = await collectTomorrow(start);
         const brief = composeBrief({ today: [], mails: [], sentences: [] }, sourceData, start, { tomorrow: true });
-        writeTomorrowBrief({ ...brief, createdAt: new Date().toISOString(), sourceData, sentencesFingerprint: null, provisional: true });
+        // Maily zítřka jsou z dnešního načtení. Když ještě běží, dlaždice čeká na ně (afterPrepare).
+        const mails = 'gmail' in sourceData || !currentData().pending?.includes('gmail')
+          ? {}
+          : { sources: [...brief.sources, 'gmail'], tiles: [...brief.tiles, waitingMails({ tomorrow: true })], pending: ['gmail'] };
+        writeTomorrowBrief({ ...brief, ...mails, createdAt: new Date().toISOString(), sourceData, sentencesFingerprint: null, provisional: true });
         if (state.day === 'tomorrow') {
           state = { ...state, rev: state.rev + 1 };
           broadcast();
         }
       } catch (err) {
         console.error(`Zítřek bez AI: ${err.message}`);
+        // Zítřek nemá co ukázat: zpátky na dnešek, ať nezůstanou kolečka.
+        if (state.day === 'tomorrow') {
+          state = { ...state, day: 'today', mode: 'idle', startAt: 0, gen: state.gen + 1, rev: state.rev + 1, label: label(tr('tomorrowFailed')) };
+          broadcast();
+        }
+        return;
       }
     }
     if (sentences && tomorrowNeedsSentences() && !collection) prepare(null, { quiet: true, day: 'tomorrow' });
@@ -130,12 +145,14 @@ function loadTomorrow({ sentences = true } = {}) {
 // Živá data pro zítřek (Merora po signálu nebo zápisu, kalendář a počasí po čtvrthodině), jen když je zítřek
 // načtený. Box a dlaždice zítřka se přepíšou na místě, když je zrovna v okně. Věty se přepíšou před přehráním.
 function writeLiveTomorrow(id, data) {
-  if (VIDEO || data == null || (collection && collectionDay === 'tomorrow') || !tomorrowLoaded()) return false;
+  if (VIDEO || (collection && collectionDay === 'tomorrow') || !tomorrowLoaded()) return false;
+  // Bez dat jen zdroj, na který zítřek čeká: kolečko zmizí a dlaždice řekne, že se nenačetl.
+  if (data == null && !tomorrowData().pending?.includes(id)) return false;
   const brief = updateTomorrowBrief((b) => rewriteSource(b, id, data, tomorrowStart()));
   if (!brief) return false;
   if (state.day === 'tomorrow') {
     const shown = bySettings(brief);
-    state = { ...state, lines: shown.today, tiles: shown.tiles, linesDay: 'tomorrow', ...(id === 'weather' && brief.weather ? { weather: brief.weather } : {}) };
+    state = { ...state, lines: shown.today, tiles: shown.tiles, pending: shown.pending ?? null, failed: shown.failed ?? null, linesDay: 'tomorrow', ...(id === 'weather' && brief.weather ? { weather: brief.weather } : {}) };
     // Panel s maily okno na místě nepřepisuje: vezme si nová data (bez načtení stránky, public/app.js takeNewData).
     if (id === 'gmail' && !isBusy()) state = { ...state, rev: state.rev + 1 };
     broadcast();
@@ -152,7 +169,9 @@ let afterCollection = null; // co udělat, až bude shrnutí nachystané
 let generatingVoice = false; // namlouvá se jiný hlas ze stránky /voices
 let preparingVoice = false; // před přehráním se namlouvají nové věty shrnutí
 let staleWindow = false; // po tiché obnově jsou na disku novější data, než ukazuje okno
-let nextQuietAttempt = 0; // po nepovedené tiché obnově se další zkouší až za čtvrt hodiny
+let nextQuietAttempt = 0; // po nepovedené tiché obnově se další zkouší za minutu, za pět a pak po čtvrthodinách
+let quietFailures = 0;
+const QUIET_RETRY_MIN = [1, 5, 15];
 let sentencesOnly = false; // běžící sběr jen přepisuje věty nad uloženými daty (tools/brief.mjs --sentences)
 let failedSentences = null; // otisk dat, nad kterými se nové věty nepovedly: ty se přehrají staré, znovu se nezkouší
 
@@ -166,7 +185,7 @@ function broadcast() {
   if (state.rev !== lastRev) {
     lastRev = state.rev;
     staleWindow = false;
-    state = { ...state, lines: null, weather: null, tiles: null, linesDay: null }; // okno si načte, co je teď na disku
+    state = { ...state, lines: null, weather: null, tiles: null, pending: null, failed: null, linesDay: null }; // okno si načte, co je teď na disku
   }
   const msg = `data: ${JSON.stringify(state)}\n\n`;
   for (const res of clients) res.write(msg);
@@ -199,9 +218,10 @@ const isPlaying = () => state.mode === 'run' && Date.now() < state.startAt + bri
 const isBusy = () => (Boolean(collection) && !quietCollection) || preparingVoice || isPlaying() || dialog.speakingOrThinking;
 // Shrnutí stačí, dokud není starší než interval obnovy z nastavení. Jen ručně: stačí vždycky, nová data
 // načte až R nebo šipka. Ukázková data (po instalaci) nestačí nikdy.
+// Dnešek, který se teprve načítá (nový den), nestačí taky: věty a maily ještě nemá.
 function isFresh() {
   const data = currentData();
-  if (data.sample) return false;
+  if (data.sample || data.provisional) return false;
   const hours = getRefreshHours();
   return !hours || Date.now() - new Date(data.createdAt).getTime() < hours * 3600 * 1000;
 }
@@ -275,6 +295,11 @@ function play(delay = 0) {
   const token = ++playToken;
   if (state.day === 'tomorrow' && !VIDEO && tomorrowNeedsSentences()) {
     prepare(() => play(delay), { day: 'tomorrow' });
+    return;
+  }
+  // Nový den ještě nemá věty: počká se na celé načtení (běží, nebo se pustí), včerejší shrnutí se neříká.
+  if (state.day === 'today' && !VIDEO && currentData().provisional) {
+    prepare(() => play(delay), { day: 'today' });
     return;
   }
   if (sentencesToRewrite()) {
@@ -375,7 +400,7 @@ function prepare(andThen = null, { again = false, quiet = false, sentences = fal
 // Sběr skončil. Povedený: okno se načte s novým shrnutím a pak se udělá, na co se čekalo, nebo Meri
 // poslouchá, když mezitím uživatel zapnul mikrofon. Nepovedený: v bublině zůstane proč a mikrofon se vypne,
 // rozhovor bez shrnutí nemá smysl.
-// Tichá obnova: chyba se jen zapíše a zkusí se to znovu za čtvrt hodiny, staré shrnutí zůstává. Nová data
+// Tichá obnova: chyba se jen zapíše a zkusí se to znovu později (QUIET_RETRY_MIN), staré shrnutí zůstává. Nová data
 // okno ukáže, až Meri nic neříká a nikdo s ní nemluví.
 // Nové věty se nepovedly: Meri řekne ty staré a nad stejnými daty to znovu nezkouší.
 function afterPrepare(error) {
@@ -399,17 +424,19 @@ function afterPrepare(error) {
     signalDuringCollection = false;
     setTimeout(() => readMeroraNow('signal', { immediate: true }), 0);
   }
+  if (!error) quietFailures = 0;
   // Celé načtení přineslo i kalendář a počasí, další čtvrthodinová obnova až za čtvrt hodiny.
   if (!error && !sentences) lastWithoutAI = Date.now();
   // Nové maily dneška přepočítají i maily zítřka (dlaždice a panel Maily na zítřek), ať Zítra sedí s Dnes.
-  if (!error && !sentences && collectionDay === 'today') {
-    const gmail = currentData()?.sourceData?.gmail;
-    if (gmail !== undefined) writeLiveTomorrow('gmail', gmail);
+  if (!sentences && collectionDay === 'today') {
+    if (error) pendingFailed();
+    writeLiveTomorrow('gmail', error ? null : currentData()?.sourceData?.gmail);
   }
   if (quiet) {
     if (error) {
       console.error(`Obnova dat: ${error}`);
-      nextQuietAttempt = Date.now() + 15 * 60_000;
+      nextQuietAttempt = Date.now() + QUIET_RETRY_MIN[Math.min(quietFailures, QUIET_RETRY_MIN.length - 1)] * 60_000;
+      quietFailures += 1;
     } else if (collectionDay === state.day) {
       staleWindow = true; // okno ukazuje tenhle den: načte se znovu, až Meri nic neříká
     }
@@ -427,13 +454,73 @@ function afterPrepare(error) {
   }
   if (error) {
     dialog.close();
-    state = { ...state, mic: false, refreshing: false, preparing: tr('spacePlaysLast', { error }) };
+    state = { ...state, mic: false, refreshing: false, preparing: tr(currentData().provisional ? 'spaceTriesAgain' : 'spacePlaysLast', { error }) };
     broadcast();
     return;
   }
   state = { ...state, mode: 'idle', startAt: 0, gen: state.gen + 1, rev: state.rev + 1, preparing: null, refreshing: false };
   broadcast();
   setTimeout(() => (andThen ? andThen() : listenWhenPossible()), AFTER_LOAD_MS);
+}
+
+// --- Nový den (Riccardo 25. 11.: po otevření okno ukázalo včerejšek) ---
+// Shrnutí na disku je z jiného dne: okno hned ukáže dnešek s kolečky a připomínky, kalendář a počasí (bez AI) se doplní
+// samy, každé, jak přijde. Maily, doplňky a věty přinese celé načtení. Merora přes konektor jde přes Clauda,
+// takže mezi rychlé nepatří.
+const quickSources = () => ['calendar', 'weather', ...(directAvailable() ? ['merora'] : [])];
+// Po probuzení počítače ještě nemusí být síť: zdroj, který se nenačetl, se zkusí ještě párkrát (vteřiny mezi pokusy),
+// kolečko se mezitím točí dál. Teprve pak „Nepodařilo se načíst“.
+const QUICK_RETRY_S = [2, 5, 10, 20];
+let loadingToday = null;
+function loadToday() {
+  if (VIDEO || process.env.MERI_DATA || loadingToday) return;
+  const waits = (id) => currentData().pending?.includes(id);
+  const ids = quickSources().filter(waits);
+  if (!ids.length) return;
+  loadingToday = Promise.all(
+    ids.map(async (id) => {
+      for (let attempt = 0; waits(id); attempt++) {
+        const data = (await collectOnly([id], new Date()))[id]; // null: nenačetl se, undefined: už není propojený
+        if (data === null && attempt < QUICK_RETRY_S.length) {
+          await new Promise((done) => setTimeout(done, QUICK_RETRY_S[attempt] * 1000));
+          continue;
+        }
+        if (!waits(id)) return; // mezitím přišel jinudy (celé načtení)
+        writeLive(id, data);
+        if (data === undefined) redraw(); // jeho box z okna zmizí
+        return;
+      }
+    }),
+  )
+    .catch((err) => console.error(`Dnešek bez AI: ${err.message}`))
+    .finally(() => {
+      loadingToday = null;
+    });
+}
+
+// Celé načtení se nepovedlo: co mělo přijít s ním, už se nenačítá. Místo věčného kolečka „Nepodařilo se načíst“.
+function pendingFailed() {
+  const slow = (b) => (b.pending ?? []).filter((id) => !quickSources().includes(id));
+  const brief = updateBrief((b) => (slow(b).length ? slow(b).reduce((x, id) => fillPending(x, id, null), b) : null));
+  if (!brief || state.day !== 'today') return;
+  state = { ...state, tiles: bySettings(brief).tiles, linesDay: 'today' };
+  staleWindow = true; // panel mailů s kolečkem zmizí, až Meri nic neříká
+  setTimeout(showNewData, 0);
+}
+
+// Den se změnil s otevřeným oknem (půlnoc, probuzení počítače), nebo se okno otevřelo až další den: server
+// běží pořád, takže po včerejšku nesmí zůstat ani živý box ve stavu. Během řeči a rozhovoru se počká.
+let shownDay = dayOf(new Date());
+function watchDay() {
+  if (VIDEO || process.env.MERI_DATA) return;
+  const today = dayOf(new Date());
+  if (today !== shownDay && !isPlaying() && !dialog.v) {
+    shownDay = today;
+    state = { ...state, mode: 'idle', startAt: 0, gen: state.gen + 1, rev: state.rev + 1 };
+    broadcast();
+  }
+  loadToday();
+  if (state.day === 'tomorrow' && !tomorrowLoaded() && !currentData().sample) loadTomorrow({ sentences: false });
 }
 
 function showNewData(attempt = 0) {
@@ -490,13 +577,16 @@ setInterval(watchPhone, 1000);
 
 setInterval(() => {
   watchSignal();
+  if (clients.size) watchDay();
   readMeroraNow('minute');
   refreshWithoutAI();
   if (VIDEO || collection || !clients.size || isBusy() || dialog.v || Date.now() < nextQuietAttempt) return;
   if (currentData().sample) return;
   // Interval z nastavení: dnešek, pak zítřek, když je načtený (nebo se chystá předem) a je starší.
-  if (!isFresh()) prepare(null, { again: true, quiet: true, day: 'today' });
-  else if (tomorrowExpired()) prepare(null, { again: true, quiet: true, day: 'tomorrow' });
+  // Při „jen ručně“ nový den načte až otevření nebo fokus okna, o půlnoci se Claude nevolá.
+  if (!isFresh()) {
+    if (getRefreshHours()) prepare(null, { again: true, quiet: true, day: 'today' });
+  } else if (tomorrowExpired()) prepare(null, { again: true, quiet: true, day: 'tomorrow' });
   else if (preloadTomorrow() && tomorrowNeedsSentences()) loadTomorrow();
 }, 60_000);
 
@@ -505,14 +595,16 @@ setInterval(() => {
 // přepíšou na místě (stav radky a pocasi), rozhovor dostane nový box taky. Věty zůstávají, jak jsou:
 // přepíšou se, až si shrnutí někdo pustí (prehraj). Během sběru ne: ten přinese data všech zdrojů sám.
 function writeLive(id, data) {
-  if (VIDEO || collection) return false;
+  // Dnešek, který se teprve načítá, se plní i během sběru: ten přinese celé shrnutí až na konci.
+  const waiting = currentData().pending?.includes(id);
+  if (VIDEO || ((collection || data == null) && !waiting)) return false;
   const brief = updateBrief((b) => rewriteSource(b, id, data));
   if (!brief) return false;
   const shown = bySettings(brief);
   const lines = shown.today;
   // Box dneška se v okně přepíše, jen když je v něm dnešek (zítřek má vlastní živá data).
   if (state.day === 'today') {
-    state = { ...state, lines, tiles: shown.tiles, linesDay: 'today', ...(id === 'weather' && brief.weather ? { weather: brief.weather } : {}) };
+    state = { ...state, lines, tiles: shown.tiles, pending: shown.pending ?? null, failed: shown.failed ?? null, linesDay: 'today', ...(id === 'weather' && brief.weather ? { weather: brief.weather } : {}) };
   }
   dialog.refreshLines(lines);
   broadcast();
@@ -667,12 +759,16 @@ function runCollection(extraArgs = []) {
   // Maily jsou hotové dřív než celé shrnutí: dlaždice se přepíše hned a kolečko u ní zmizí.
   collection.on('message', (msg) => {
     if (msg?.source !== 'gmail' || collectionDay !== 'today' || msg.data == null) return;
+    // Dnešek, který se teprve načítá: maily se ukážou hned i s panelem, věty a doplňky doběhnou po nich.
+    const filled = currentData().pending?.includes('gmail') ? updateBrief((b) => rewriteSource(b, 'gmail', msg.data)) : null;
+    const swap = filled && state.day === 'today' && !isBusy() && !dialog.v;
     const tile = mailBoxes(msg.data, [], new Date()).tile;
     const tiles = state.day === 'today' ? (state.linesDay === 'today' && state.tiles ? state.tiles : bySettings(currentData()).tiles) : null;
     state = {
       ...state,
       loadedTiles: [...new Set([...(state.loadedTiles ?? []), 'mails'])],
       ...(tiles ? { tiles: tiles.map((d) => (d.id === 'mails' ? tile : d)), linesDay: 'today' } : {}),
+      ...(swap ? { rev: state.rev + 1 } : {}),
     };
     broadcast();
   });
@@ -717,7 +813,7 @@ function redraw() {
 // zbytečně). Okno se pak načte znovu, ať má zvuk, až Meri nic nechystá ani neříká.
 function fillVoice() {
   // Věty, které se před přehráním stejně přepíšou, se namlouvat nebudou.
-  if (VIDEO || !state.voice || currentData().sample || isVoiced(currentVoice()) || sentencesToRewrite()) return;
+  if (VIDEO || !state.voice || currentData().sample || currentData().provisional || isVoiced(currentVoice()) || sentencesToRewrite()) return;
   const redrawWhenPossible = (attempt = 0) => {
     if (!redraw() && attempt < 100) setTimeout(() => redrawWhenPossible(attempt + 1), 3000);
   };
@@ -940,6 +1036,7 @@ function applyCommand(cmd) {
       state = { ...state, day: 'today', rev: state.rev + 1 };
       broadcast();
     }
+    watchDay();
     if (!isBusy() && !dialog.v) prepare(null, { quiet: true, day: 'today' });
     readMeroraNow('window');
     dialog.warmUp(); // ⌥M / Alt+M hned zapíná mikrofon: Claude ať už běží
@@ -953,6 +1050,9 @@ function applyCommand(cmd) {
   }
   // Okno dostalo fokus (přepnutí z jiné aplikace): Merora hned, nic dalšího se neděje.
   if (cmd.cmd === 'merora') {
+    watchDay();
+    // Okno otevřené přes noc: nový den se načte celý, jakmile k němu někdo přijde. Po nezdaru až po chvíli.
+    if (currentData().provisional && !collection && !isBusy() && !dialog.v && Date.now() >= nextQuietAttempt) prepare(null, { quiet: true, day: 'today' });
     readMeroraNow('focus');
     return true;
   }
@@ -1075,6 +1175,7 @@ async function api(req, res, pathname) {
   const post = req.method === 'POST';
   if (pathname === '/events') {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
+    watchDay(); // dřív než stav: nový den z něj vymaže včerejší živý box
     res.write(`data: ${JSON.stringify(state)}\n\n`);
     clients.add(res);
     req.on('close', () => {
@@ -1095,7 +1196,9 @@ async function api(req, res, pathname) {
     // Seznam všech nepřečtených mailů je jen pro rozhovor, data zdrojů (sourceData) jen pro server, okno je nepotřebuje.
     const data = shownData();
     const { inbox, sourceData: _, sentencesFingerprint, ...forWindow } = bySettings(data);
-    json(res, 200, { ...forWindow, day: data.day === 'tomorrow' ? 'tomorrow' : 'today', language: language() });
+    const day = data.day === 'tomorrow' ? 'tomorrow' : 'today';
+    // Datum dne, který okno ukazuje, i bez počasí (dřív ho neslo jen počasí a zítřek bez něj měl dnešní datum).
+    json(res, 200, { ...forWindow, day, date: dateForScreen(day === 'tomorrow' ? tomorrowStart() : new Date()), language: language() });
     return true;
   }
   // Je okno Meri otevřené? Klávesa ⌥M / Alt+M podle toho jen přepne mikrofon, nebo Meri otevře.
