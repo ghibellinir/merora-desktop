@@ -7,12 +7,12 @@ Merora na počítači. Každé ráno ti Meri, neuron z Merory, projde připomín
 ## Co potřebuješ
 
 - Mac nebo Windows a Google Chrome.
-- Claude s předplatným (Pro nebo vyšší) a [Claude Code](https://claude.com/claude-code), do kterého se jednou přihlásíš.
+- Claude s předplatným (Pro nebo vyšší) a [Claude Code](https://claude.com/claude-code), do kterého se jednou přihlásíš. S Claudem zdarma to nejde.
 - Nepovinné: účet **Merora** (Meri čte tvoje připomínky, s Merora Pro je i mění; propojení se potvrzuje v appce Merora 1.3.0 nebo novější) a účet u **ElevenLabs** (Meri mluví nahlas, jinak jen píše).
 
 ## Instalace
 
-**Nejjednodušší je říct to Claudovi.** Otevři Claude Code a napiš:
+**Nejjednodušší je říct to Claudovi.** Otevři Terminál (na Windows PowerShell), napiš `claude` a do Claude Code napiš následující větu. Ne do chatu na claude.ai ani v aplikaci Claude, ten do tvého počítače nevidí.
 
 > Nainstaluj mi Merora Desktop z https://github.com/ghibellinir/merora-desktop
 
@@ -28,7 +28,7 @@ Všechno jde i později v nastavení (ozubené kolečko vpravo nahoře, ukáže 
 
 - **Merora:** v úvodu nebo v nastavení u Merory klikni na **Propojit s účtem Merora**. V prohlížeči se otevře stránka Merory s QR kódem, naskenuješ ho telefonem a propojení potvrdíš v appce Merora. Okno Merory to pak samo pozná a načte nová data. Merora Desktop najdeš v appce v Nastavení › Připojené aplikace, kde jde odpojit, a změny z počítače telefon dostane hned. Opačně taky: připomínka přidaná nebo smazaná v telefonu (nebo přes Clauda) se v okně ukáže hned, protože Merora dá Desktopu o každé změně vědět, a kdyby zpráva nedošla, nejpozději do minuty (volba Merora hned po změně v nastavení). Číst jde s každým účtem, měnit s Merora Pro.
 - **Gmail:** v Claudovi Nastavení › Konektory › Gmail. Meri v něm jen hledá a čte, nic nepošle, nesmaže ani neoznačí jako přečtené.
-- **Kalendář:** odkaz na kalendář ve formátu iCal vlož v úvodu nebo v nastavení u Kalendáře. Kdo odkaz má, vidí kalendář, tak ho nikomu neposílej.
+- **Kalendář:** odkaz na kalendář ve formátu iCal (ICS) vlož v úvodu nebo v nastavení u Kalendáře. Merora ho před uložením zkusí načíst a později ho jde změnit nebo odpojit. Kdo odkaz má, vidí kalendář, tak ho nikomu neposílej.
   - Google: Kalendář na webu › Nastavení › tvůj kalendář › Tajná adresa ve formátu iCal.
   - Apple (iCloud): v appce Kalendář na Macu pravým na kalendář › Sdílet kalendář › zaškrtni Veřejný kalendář › zkopíruj odkaz (začíná webcal://). Na iCloud.com totéž přes ikonu sdílení u kalendáře.
   - Outlook: Outlook.com › Nastavení › Kalendář › Sdílené kalendáře › Publikovat kalendář › Může zobrazit všechny podrobnosti › Publikovat › odkaz ICS. U firemního účtu to může mít správce vypnuté.

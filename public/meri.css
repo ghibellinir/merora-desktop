@@ -349,6 +349,8 @@ body.no-cursor .corner .tooltip:not(.shown) { opacity: 0; }
 .settings .link { display: flex; gap: 8px; margin-top: 8px; }
 .settings .link input { flex: 1; min-width: 0; width: auto; padding: 8px 10px; font-size: 14px; }
 .settings .link .button { padding: 8px 14px; }
+.settings .link-actions { display: flex; gap: 8px; margin-top: 8px; }
+.settings .link-actions .button { padding: 6px 12px; font-size: 14px; }
 .settings .check { margin-top: 8px; padding: 6px 12px; font-size: 14px; }
 a.button { display: inline-block; text-decoration: none; }
 .settings .connect { margin-top: 8px; padding: 6px 12px; font-size: 14px; }

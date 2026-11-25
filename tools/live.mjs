@@ -130,6 +130,22 @@ export function fillPending(brief, id, data, now = new Date()) {
   };
 }
 
+// Odpojený zdroj (odkaz na kalendář): jeho řádky, dlaždice a data zmizí hned, bez nového načtení.
+export function withoutSource(brief, id) {
+  if (brief.sample || !(brief.sources ?? []).includes(id)) return null;
+  const { [id]: _, ...sourceData } = brief.sourceData ?? {};
+  return {
+    ...brief,
+    sources: brief.sources.filter((x) => x !== id),
+    failed: (brief.failed ?? []).filter((x) => x !== id),
+    ...(brief.pending ? { pending: brief.pending.filter((x) => x !== id) } : {}),
+    sourceData,
+    today: MATCHING[id] ? brief.today.filter((r) => !MATCHING[id].belongs(r)) : brief.today,
+    tiles: brief.tiles.filter((d) => d.id !== CORE_TILE[id] && d.source !== id),
+    weather: id === 'weather' ? null : brief.weather,
+  };
+}
+
 // Shrnutí s novými daty jednoho zdroje (merora, kalendar, pocasi), nebo null, když se nic nezměnilo.
 // Zdroj, který ve shrnutí není (byl vypnutý, když vznikalo), počká na další načtení všech dat.
 export function rewriteSource(brief, id, data, now = new Date()) {

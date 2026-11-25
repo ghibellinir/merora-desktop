@@ -3,21 +3,32 @@
 import { loadEnv } from './elevenlabs.mjs';
 
 import { ZONE } from './time.mjs'; // časové pásmo počítače
+import { ianaZone } from './zones.mjs';
 const DAY_MS = 86_400_000;
 const WEEKDAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 
+const formats = new Map(); // jedno na pásmo: Outlook má pásmo u každé události a nové Intl je pomalé
+function zoneFormat(zone) {
+  if (!formats.has(zone)) {
+    formats.set(
+      zone,
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: zone,
+        hourCycle: 'h23',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }),
+    );
+  }
+  return formats.get(zone);
+}
 function vZone(instant, zone = ZONE) {
   const p = Object.fromEntries(
-    new Intl.DateTimeFormat('en-CA', {
-      timeZone: zone,
-      hourCycle: 'h23',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    })
+    zoneFormat(zone)
       .formatToParts(instant)
       .map((x) => [x.type, x.value]),
   );
@@ -35,7 +46,7 @@ function icsTime(amount, zone) {
   if (m[4] === undefined) return { day: `${m[1]}-${m[2]}-${m[3]}`, time: null };
   let instant = Date.UTC(r, monthNum - 1, d, h, minuteNum, s);
   if (!m[7]) {
-    const z = zone || ZONE;
+    const z = ianaZone(zone) ?? ZONE;
     if (z === ZONE) return { day: `${m[1]}-${m[2]}-${m[3]}`, time: `${h}:${m[5]}` };
     // Místní čas jiné zóny: posun se dopočítá z toho, co by tahle zóna ukazovala.
     const c = vZone(new Date(instant), z);
@@ -196,9 +207,9 @@ function download(link) {
     try {
       res = await fetch(link, { signal: AbortSignal.timeout(30_000) });
     } catch {
-      throw new Error('Google Kalendář se nepodařilo stáhnout.');
+      throw new Error('Kalendář se nepodařilo stáhnout.');
     }
-    if (!res.ok) throw new Error(`Google Kalendář vrátil chybu ${res.status}.`);
+    if (!res.ok) throw new Error(`Kalendář vrátil chybu ${res.status}.`);
     return res.text();
   })();
   lastIcs = { link, when: Date.now(), work };
@@ -206,6 +217,29 @@ function download(link) {
     if (lastIcs?.work === work) lastIcs = null; // chyba se nepamatuje
   });
   return work;
+}
+
+// Nový odkaz z úvodu nebo nastavení se před uložením stáhne a přečte, ať se neuloží něco, co kalendář není (25. 11.: tester
+// s odkazem, který nešel přečíst, zůstal bez kalendáře). Outlook dává vedle sebe odkaz HTML a ICS: HTML se převede.
+// Vrací { link } s tím, co se má uložit, nebo { problem }: unreachable (i se stavem), notIcal. Odkaz v chybě není.
+const OUTLOOK_HTML = /^(https:\/\/outlook\.(?:live|office365|office)\.com\/.+)\/(?:index|calendar)\.html$/i;
+export async function verifyLink(address) {
+  const link = address.replace(OUTLOOK_HTML, '$1/calendar.ics');
+  let res;
+  try {
+    res = await fetch(link, { signal: AbortSignal.timeout(20_000) });
+  } catch {
+    return { problem: 'unreachable' };
+  }
+  if (!res.ok) return { problem: 'unreachable', status: res.status };
+  const text = await res.text().catch(() => '');
+  if (!/^\uFEFF?\s*BEGIN:VCALENDAR/i.test(text)) return { problem: 'notIcal' };
+  try {
+    parseIcs(text);
+  } catch {
+    return { problem: 'notIcal' };
+  }
+  return { link };
 }
 
 // Shrnutí a živá data (každou čtvrthodinu) stahují pokaždé znovu.

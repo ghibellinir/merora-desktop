@@ -28,7 +28,7 @@ import {
 import { findCity } from './tools/weather.mjs';
 import { SOURCES, isEnabled, fingerprintForSentences, bySettings, toggleSource, collectOnly, sourceOptions } from './tools/sources/index.mjs';
 import { MERORA_MCP, prepareReminders } from './tools/sources/merora.mjs';
-import { fillPending, rewriteSource, sentencesStale } from './tools/live.mjs';
+import { fillPending, rewriteSource, sentencesStale, withoutSource } from './tools/live.mjs';
 import { pendingDay, waitingMails } from './tools/pending.mjs';
 import { checkForUpdate, updateInfo, applyUpdate, currentVersion } from './tools/update.mjs';
 import { tr } from './tools/i18n.mjs';
@@ -742,6 +742,15 @@ function loadAfterConnecting() {
   prepare(null, { again: true, quiet: true, day: 'today' });
 }
 
+// Nová data jednoho zdroje bez AI hned (změněný odkaz na kalendář), pro dnešek i načtený zítřek.
+async function reloadSource(id) {
+  const fresh = await collectOnly([id], new Date());
+  if (fresh[id] != null) writeLive(id, fresh[id]);
+  if (!tomorrowLoaded()) return;
+  const next = await collectOnly([id], tomorrowStart());
+  if (next[id] != null) writeLiveTomorrow(id, next[id]);
+}
+
 function runCollection(extraArgs = []) {
   let reason = tr('briefFailed');
   let ended = false;
@@ -1253,15 +1262,31 @@ async function api(req, res, pathname) {
   }
   // Odkaz zdroje (tajný odkaz na kalendář) z úvodu nebo nastavení. Ukládá se jen do .env na tomhle počítači.
   if (pathname === '/api/source/link' && post) {
-    const { source, link } = await readBody(req);
+    const { source, link, remove } = await readBody(req);
     const z = SOURCES.find((x) => x.id === source && x.connection.kind === 'link');
+    // Odpojit: odkaz se smaže a co z něj bylo na obrazovce, zmizí hned.
+    if (z && remove === true) {
+      writeEnv(z.connection.env, '');
+      updateBrief((b) => withoutSource(b, z.id));
+      updateTomorrowBrief((b) => withoutSource(b, z.id));
+      redraw();
+      json(res, 200, settingsState());
+      return true;
+    }
     const address = String(link ?? '').trim().replace(/^webcal:\/\//i, 'https://');
     if (!z || !/^https:\/\/\S+$/.test(address) || address.length > 1500) {
       json(res, 400, { error: tr('notCalendarLink'), ...settingsState() });
       return true;
     }
-    writeEnv(z.connection.env, address);
-    loadAfterConnecting();
+    const checked = z.verify ? await z.verify(address) : { link: address };
+    if (!checked.link) {
+      json(res, 400, { error: checked.error, ...settingsState() });
+      return true;
+    }
+    writeEnv(z.connection.env, checked.link);
+    // Jiný odkaz u zdroje, který ve shrnutí už je: jen jeho nová data, bez AI. Nový zdroj: celé načtení.
+    if (z.noAI && currentData().sources?.includes(z.id) && !currentData().sample) await reloadSource(z.id);
+    else loadAfterConnecting();
     json(res, 200, settingsState());
     return true;
   }

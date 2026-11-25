@@ -11,14 +11,24 @@ export const sourcesHtml = (sources, prefix) =>
     .map((z) => {
       // Co chybí, má smysl jen u zapnutého zdroje (vypnutý zdroj nového uživatele nezajímá).
       const problem = z.enabled ? z.problem : null;
-      const note = problem ?? (z.failed ? t('sourceFailed') : z.connected ? t('sourceConnected') : z.connector ? t('sourceConnector') : '');
+      const note = problem ?? (z.failed ? t('sourceFailed') : z.connected ? t(z.link ? 'sourceLinked' : 'sourceConnected') : z.connector ? t('sourceConnector') : '');
       const id = `${prefix}-zdroj-${esc(z.id)}`;
+      // Odkaz: chybějící nebo takový, který se minule nenačetl, má pole rovnou. Uložený jde změnit a odpojit (25. 11.:
+      // tester uložil špatný odkaz, pole zmizelo a kalendář už propojit nešel).
+      const askLink = !z.connected || z.failed;
       const link =
-        z.link && problem
-          ? `<div class="link">
+        z.link && z.enabled
+          ? `<div class="link-form"${askLink ? '' : ' hidden'}><div class="link">
               <input type="url" autocomplete="off" placeholder="https://…" aria-label="${esc(t('sourceLink', { title: z.title }))}">
               <button type="button" class="button save-link" data-source="${esc(z.id)}">${t('save')}</button>
-            </div>${z.hint ? `<div class="caption">${esc(z.hint)}</div>` : ''}`
+            </div><div class="caption warning link-error" role="alert"></div>${z.hint ? `<div class="caption">${esc(z.hint)}</div>` : ''}</div>${
+              z.connected
+                ? `<div class="link-actions">
+              ${askLink ? '' : `<button type="button" class="button secondary edit-link">${t('changeLink')}</button>`}
+              <button type="button" class="button secondary remove-link" data-source="${esc(z.id)}">${t('disconnect')}</button>
+            </div>`
+                : ''
+            }`
           : '';
       const checkable = z.checkable
         ? `<button type="button" class="button secondary check" data-source="${esc(z.id)}">${t('check')}</button>`
@@ -41,8 +51,8 @@ export const sourcesHtml = (sources, prefix) =>
     .join('');
 
 // Kliknutí v řádcích zdrojů (nastavení i úvod): přepínač, uložení odkazu, kontrola nebo propojení účtu.
-// Vrací { ok, data, changed, connecting } (changed = okno se po zavření načte znovu, connecting = id zdroje,
-// na jehož propojení se čeká), nebo null, když nešlo o zdroj.
+// Vrací { ok, data, changed, connecting, keep } (changed = okno se po zavření načte znovu, connecting = id zdroje,
+// na jehož propojení se čeká, keep = řádky nepřekreslovat, ať nezmizí vložený odkaz), nebo null, když není co dělat.
 export async function clickOnSource(e) {
   const connect = e.target.closest('.connect[data-source]');
   if (connect) return { ok: true, data: {}, changed: false, connecting: connect.dataset.source };
@@ -56,7 +66,33 @@ export async function clickOnSource(e) {
   }
   const saveButton = e.target.closest('.save-link');
   if (saveButton) {
+    // Server odkaz nejdřív zkusí stáhnout. Když to kalendář není, pole zůstane, jak je, ať jde opravit.
+    saveButton.disabled = true;
+    saveButton.textContent = t('checking');
     const { ok, data } = await post('/api/source/link', { source: saveButton.dataset.source, link: saveButton.previousElementSibling.value });
+    saveButton.disabled = false;
+    saveButton.textContent = t('save');
+    // Proč to nejde, je hned pod polem. Zdroje se nepřekreslují, ať odkaz v poli zůstane.
+    saveButton.closest('.link-form').querySelector('.link-error').textContent = ok ? '' : data.error ?? t('saveFailed');
+    return { ok, data, changed: ok, keep: !ok };
+  }
+  const edit = e.target.closest('.edit-link');
+  if (edit) {
+    const form = edit.closest('.description').querySelector('.link-form');
+    form.hidden = false;
+    edit.remove();
+    form.querySelector('input').focus();
+    return null;
+  }
+  const remove = e.target.closest('.remove-link');
+  if (remove) {
+    // Druhé kliknutí potvrzuje, jako u odpojení účtu.
+    if (remove.dataset.sure === undefined) {
+      remove.dataset.sure = '';
+      remove.textContent = t('reallyDisconnect');
+      return null;
+    }
+    const { ok, data } = await post('/api/source/link', { source: remove.dataset.source, remove: true });
     return { ok, data, changed: ok };
   }
   const checkable = e.target.closest('.check');
@@ -569,6 +605,7 @@ export function settingsWindow() {
       return;
     }
     if (result.data.sources) snapshot = result.data;
+    if (result.keep) return;
     render();
     if (result.changed) sourcesChanged = true;
     $('sources-note').textContent = result.ok ? SOURCES_NOTE() : result.data.error ?? t('failed');

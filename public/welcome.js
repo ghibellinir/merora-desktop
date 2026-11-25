@@ -10,6 +10,25 @@ const onWindows = /Win/i.test(navigator.platform || navigator.userAgent);
 // Klávesa odkudkoli (npm run hotkey): Mac ⌥M, Windows Alt+M, jinde jen M v okně.
 const hotkeyAnywhere = onMac ? '⌥M' : onWindows ? 'Alt+M' : null;
 
+// Kde úvod skončil: okno otevřené znovu (zavřený Chrome, nainstalovaná aplikace) v něm pokračuje a nezačíná od začátku
+// (25. 11.: tester musel úvod projít dvakrát). Jen pohodlí v tomhle prohlížeči, bez úložiště začne od začátku.
+const PROGRESS = 'merora-welcome-step';
+const progress = {
+  get: () => {
+    try {
+      return Number(localStorage.getItem(PROGRESS)) || 0;
+    } catch {
+      return 0;
+    }
+  },
+  set: (value) => {
+    try {
+      if (value === null) localStorage.removeItem(PROGRESS);
+      else localStorage.setItem(PROGRESS, String(value));
+    } catch {}
+  },
+};
+
 // Vrátí se, až se úvod zavře (hned, když se neukazuje). Hodnota: přepnul se v úvodu nějaký zdroj?
 export async function welcome({ again = false } = {}) {
   let snapshot = await (await fetch('/api/settings')).json();
@@ -169,6 +188,7 @@ export async function welcome({ again = false } = {}) {
           }
           if (result.data.sources) snapshot = result.data;
           if (result.changed) sourcesChanged = true;
+          if (result.keep) return error('');
           $('welcome-sources').innerHTML = sourcesHtml(snapshot.sources, 'welcome');
           error(result.ok ? '' : result.data.error);
         });
@@ -231,9 +251,12 @@ export async function welcome({ again = false } = {}) {
     },
   ];
 
-  let i = 0;
+  let i = again ? 0 : Math.min(Math.max(progress.get(), 0), steps.length - 1);
   const render = () => {
     const k = steps[i];
+    if (!again) progress.set(i);
+    // Na posledním kroku je úvod hotový: okno nainstalované aplikace ho už neukáže znovu.
+    if (i === steps.length - 1) post('/api/settings', { welcomed: true });
     $('welcome-title').textContent = k.title();
     $('welcome-step').innerHTML = k.body();
     k.onAny?.();
@@ -257,6 +280,7 @@ export async function welcome({ again = false } = {}) {
     removeEventListener('keydown', onKey);
     await saveLanguage(); // i po zavření v prvním kroku, ať server mluví jazykem, který byl vidět
     await post('/api/settings', { welcomed: true });
+    progress.set(null);
     overlay.remove();
     closed(sourcesChanged);
   };

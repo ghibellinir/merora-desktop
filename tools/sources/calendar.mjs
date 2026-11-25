@@ -2,7 +2,7 @@
 // Odkaz se vkládá v úvodu nebo v nastavení a ukládá se jen do .env na tomhle počítači (GOOGLE_CALENDAR_ICAL).
 import { dayOf } from '../time.mjs';
 import { loadEnv } from '../elevenlabs.mjs';
-import { todayEvents } from '../calendar.mjs';
+import { todayEvents, verifyLink } from '../calendar.mjs';
 import { tr } from '../i18n.mjs';
 import { notConnected } from './not-connected.mjs';
 
@@ -38,6 +38,14 @@ export default {
   // Co se počítá za změnu: název a čas. Id jsou podle pořadí (k1, k2…), po nové události se posunou.
   fingerprint: (events) => events.map((u) => [u.text, u.when]),
   problem: () => (loadEnv().GOOGLE_CALENDAR_ICAL ? null : tr('calendarMissing')),
+  // Odkaz je uložený (okno ho nabídne změnit nebo odpojit).
+  connected: () => Boolean(loadEnv().GOOGLE_CALENDAR_ICAL),
+  // Zkouška nového odkazu před uložením: { link }, nebo { error } s textem pro člověka.
+  verify: async (address) => {
+    const { link, problem, status } = await verifyLink(address);
+    if (link) return { link };
+    return { error: problem === 'notIcal' ? tr('calendarNotIcal') : status ? tr('calendarStatus', { status }) : tr('calendarUnreachable') };
+  },
   hint:
     'Google: Kalendář na webu › Nastavení › tvůj kalendář › Tajná adresa ve formátu iCal. ' +
     'Apple: appka Kalendář › pravým na kalendář › Sdílet kalendář › Veřejný kalendář › zkopírovat odkaz. ' +
