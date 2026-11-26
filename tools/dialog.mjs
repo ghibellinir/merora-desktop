@@ -19,7 +19,7 @@ import { addTexts, tr } from './i18n.mjs';
 import { eventsAhead } from './calendar.mjs';
 import {
   doneReminders, hasOAuth, restoreReminder, fetchReminders, moveReminder, deleteReminder, createReminder, changeList, markDone,
-  unmarkDone,
+  unmarkDone, reminderRings,
 } from './merora.mjs';
 import { MAX_ITEMS, planAdding, afterChange, itemsFromSentence, listsFromRows, joinWords, pickList } from './lists.mjs';
 import { timeForLine, shorten, removeLine, lineForReminder, insertLine, restoreLine, changeLine } from './lines.mjs';
@@ -72,9 +72,8 @@ addTexts({
     dlg_noList: 'Žádný seznam v Meroře nemáš. Založ si ho v appce a pak do něj budu přidávat.',
     dlg_whatToAdd: 'Co tam mám přidat?',
     dlg_fullList: 'Do toho seznamu se už nic nevejde, unese nejvýš {max} věcí.',
-    dlg_openMerora: 'Otevři si Meroru v mobilu, ať to stihne zazvonit.',
-    dlg_openMeroraDeleted: 'Otevři si Meroru v mobilu, ať to už nezazvoní.',
     dlg_phoneUnaware: 'Otevři si pak Meroru v mobilu, ať o tom telefon ví.',
+    dlg_phoneMissed: 'Nepovedlo se mi to dostat do mobilu. Otevři prosím Meroru v telefonu.',
     dlg_inPlace: 'Dobře, je to tam.',
     dlg_changed: 'Dobře, změněno.',
     dlg_willRemind: 'Dobře, připomenu ti to.',
@@ -129,9 +128,8 @@ addTexts({
     dlg_noList: "You don't have any list in Merora. Create one in the app and then I'll add to it.",
     dlg_whatToAdd: 'What should I add?',
     dlg_fullList: 'Nothing more fits in that list, it holds at most {max} items.',
-    dlg_openMerora: 'Open Merora on your phone so it can ring in time.',
-    dlg_openMeroraDeleted: "Open Merora on your phone so it doesn't ring anymore.",
     dlg_phoneUnaware: 'Open Merora on your phone afterwards so the phone knows about it.',
+    dlg_phoneMissed: "I couldn't get that onto your phone. Please open Merora on your phone.",
     dlg_inPlace: "Okay, it's in.",
     dlg_changed: 'Okay, changed.',
     dlg_willRemind: "Okay, I'll remind you.",
@@ -189,11 +187,8 @@ const LIST_ERROR = () => tr('dlg_listError');
 const NO_LIST = () => tr('dlg_noList');
 const WHAT_TO_ADD = () => tr('dlg_whatToAdd');
 const FULL_LIST = () => tr('dlg_fullList', { max: MAX_ITEMS });
-const OPEN_MERORA = () => tr('dlg_openMerora');
-const OPEN_MERORA_DELETED = () => tr('dlg_openMeroraDeleted');
 const PHONE_UNAWARE = () => tr('dlg_phoneUnaware');
-// Pod tolik do termínu tichá zpráva z Merory nemusí stihnout naplánovat budík (nejlepší případ kolem 10 s).
-const SOON_MS = 5 * 60_000;
+const PHONE_MISSED = () => tr('dlg_phoneMissed');
 const HOW_MANY = ['jednu', 'dvě', 'tři', 'čtyři', 'pět', 'šest', 'sedm', 'osm', 'devět', 'deset', 'jedenáct', 'dvanáct'];
 const ORDINALS = ['první', 'druhé', 'třetí', 'čtvrté', 'páté', 'šesté', 'sedmé', 'osmé', 'deváté', 'desáté', 'jedenácté', 'dvanácté'];
 // Přesun slovy umí jen čeština (rychlá cesta), anglicky potvrzení přesunu říká model.
@@ -201,6 +196,7 @@ const movedTo = (time) => `Dobře, je to ${time}.`;
 // Namluvené dopředu, aby šly přehrát hned. Půlhodiny a čtvrthodiny se namluví, až je poprvé řekne.
 const ahead = () => [
   GOODBYE(), ENDED(), UNDONE(), DID_NOT_UNDERSTAND(), DELETED(), SKIPPED(), DELETED_SERIES(), KEEPING(), ONLY_THIS_OR_ALL(),
+  PHONE_MISSED(),
   ...(english() ? [] : HOW_MANY.map((k) => movedTo(`na ${k}`))),
 ];
 
@@ -214,17 +210,14 @@ const PROBLEM_TEXTS = {
 
 const problemText = (code) => tr(PROBLEM_TEXTS[code] ?? 'dlg_micBroken');
 
-// Telefon si budík naplánuje sám, až se o změně dozví. Po připojení přes OAuth mu Merora pošle tichou
-// zprávu, iOS ji ale může zdržet a appce vyhozené z přepínače ji nedoručí. U přihlášení postaru nepřijde
-// vůbec. Proto rada otevřít Meroru: postaru vždycky, jinak u termínu do 5 minut (jako SYNC_NOTE v MCP).
-// U smazané připomínky jde o to, aby telefon nezazvonil něco, co už v Meroře není.
-export function withPhoneHint(sentence, when, { oauth = hasOAuth(), now = Date.now(), deleted = false } = {}) {
-  if (VIDEO || !when) return sentence;
-  const soon = deleted ? OPEN_MERORA_DELETED() : OPEN_MERORA();
-  const advice = !oauth ? PHONE_UNAWARE() : when.getTime() - now < SOON_MS ? soon : null;
-  if (!advice) return sentence;
-  const together = `${String(sentence ?? '').trim()} ${advice}`.trim();
-  return together.length <= 140 ? together : `${tr('dlg_inPlace')} ${advice}`;
+// Telefon si budík naplánuje sám, až se o změně dozví. Po připojení přes OAuth server hlídá, jestli ji převzal
+// (server.mjs watchPhone), a když ne, Meri to řekne sama (sayPhoneNotice), u brzké připomínky dřív. Odpověď
+// proto o mobilu nic neříká: radit otevřít appku naslepo, když to mobil převzal, mátlo (Riccardo 26. 11.).
+// Bez OAuth (konektor) se stav zjistit nedá, tehdy rada otevřít Meroru vždycky.
+export function withPhoneHint(sentence, when, { oauth = hasOAuth() } = {}) {
+  if (VIDEO || !when || oauth) return sentence;
+  const together = `${String(sentence ?? '').trim()} ${PHONE_UNAWARE()}`.trim();
+  return together.length <= 140 ? together : `${tr('dlg_inPlace')} ${PHONE_UNAWARE()}`;
 }
 
 // Podle nastavení „O tobě“: oslovení a rod (tvary „mu/jí“, „k muži/k ženě“).
@@ -237,12 +230,15 @@ Urči, co se má stát:
 - create: založit novou připomínku v Meroře („připomeň mi…“, „dej mi do Merory…“, „zapiš si…“). task je krátký text připomínky, jak by si ho napsal sám, bez slov „připomeň mi“ („Zavolat tátovi“). when je místní čas RRRR-MM-DDTHH:MM, nebo prázdný, když čas neřekl (pak jde do Kdykoli). Den bez hodiny je unclear. Nikdy ne do minulosti.
 - add_to_list: přidat věci do seznamu, který v Meroře už má (lists v datech): „přidej do nákupního seznamu chleba“, „dej na seznam Vánoce dárek pro mámu“, „do nákupu mléko a máslo“. Jen když řekne slovo seznam nebo jméno seznamu, „kup chleba“ je create. list je id seznamu z dat. items jsou jednotlivé věci v prvním pádě s velkým písmenem, každá zvlášť („kup vodu“ je „Voda“, „dvě mléka“ jsou „Dvě mléka“). Když neřekne do kterého a k věcem se jasně hodí jeden seznam (chleba do nákupního), vyber ho, jinak se zeptej (unclear). Seznam, který nemá, nezakládáš: to je unsupported a řekni, ať si ho založí v appce Merora.
 - delete: smazat jednu připomínku („smaž…“, „zruš…“, „vymaž…“, „tohle už nepotřebuju“). id je přesně z items. Hned se nemaže: answer je otázka, jestli to opravdu smazat, s tím, co a kdy („Mám smazat zubaře v pondělí v deset?“). Čas řekni s v nebo ve („dnes ve tři“), ne „na tři“. U opakované (repeats) se zeptej, jestli jen tuhle, nebo celé opakování („Rutina se opakuje. Mám smazat jen dnešní, nebo celé opakování?“). Když na tvou otázku odpoví ano, nebo kterou možnost chce, vrať delete znovu se stejným id a u opakované se scope occurrence, nebo series. Když nechce, vrať info s odpovědí „Dobře, nechávám to tam.“. Položky s can_delete false (seznamy, navázané úkoly, kalendář) smazat neumíš.
-- info: ptá se na své připomínky a události na kterýkoli den (items jsou všechny otevřené připomínky z Merory: dnes, další dny, po termínu, na místo a Kdykoli, a události z jeho kalendáře na dnešek a dalších 7 dní se source calendar), na to, co už udělal (done jsou poslední splněné a přeskočené), na něco z dnešního shrnutí (brief v datech), nebo co má v seznamu (lists v datech): co má zítra, kdy má zubaře, co včera udělal, jaké má maily, jaké je počasí, co jsi říkala. Události z kalendáře jsou stejně důležité jako připomínky z Merory: u otázky na den nebo na to, co ho čeká, vezmi obojí dohromady podle času a nic z toho dne nevynechávej jen proto, že je v kalendáři. Celodenní (all_day) řekni bez času. U otázky na celý den řekni nejvýš čtyři věci podle času a kolik dalších zbývá. Odpověz jen z dat, nic nedomýšlej. Všechny nepřečtené maily jsou v brief.inbox: předmět, od koho (jméno nebo firma), kdy, krátce o čem a jestli spěchá. Celý text mailu nevíš. Na „jaké mám další maily“ řekni nejvýš tři, o kterých jsi ještě nemluvila, důležité první, a kolik jich zbývá („a pět newsletterů“). highlight je id boxu nebo řádku, o kterém mluvíš (mails, weather, id dlaždice nebo panelu z brief, nebo id řádku), jinak prázdné.
+- info: ptá se na své připomínky a události na kterýkoli den (items jsou všechny otevřené připomínky z Merory: dnes, další dny, po termínu, na místo a Kdykoli, a události z jeho kalendáře na dnešek a dalších 7 dní se source calendar), na to, co už udělal (done jsou poslední splněné a přeskočené), na něco z dnešního shrnutí (brief v datech), nebo co má v seznamu (lists v datech): co má zítra, kdy má zubaře, co včera udělal, jaké má maily, jaké je počasí, co jsi říkala. Události z kalendáře jsou stejně důležité jako připomínky z Merory: u otázky na den nebo na to, co ho čeká, vezmi obojí dohromady podle času a nic z toho dne nevynechávej jen proto, že je v kalendáři. Celodenní (all_day) řekni bez času. U otázky na celý den řekni nejvýš čtyři věci podle času a kolik dalších zbývá. Odpověz jen z dat, nic nedomýšlej. Všechny nepřečtené maily jsou v brief.inbox (když má místo unread received_last_two_days, jsou to nové maily za poslední dva dny a o přečtení nic nevíš): předmět, od koho (jméno nebo firma), kdy, krátce o čem a jestli spěchá. Celý text mailu nevíš. Na „jaké mám další maily“ řekni nejvýš tři, o kterých jsi ještě nemluvila, důležité první, a kolik jich zbývá („a pět newsletterů“). highlight je id boxu nebo řádku, o kterém mluvíš (mails, weather, id dlaždice nebo panelu z brief, nebo id řádku), jinak prázdné.
 - complete: označit jednu připomínku jako hotovou („odškrtni zubaře“, „zubaře mám hotového“, „to už jsem udělal“, „volání tátovi je hotové“). id je přesně z items a jen s can_complete true. U opakované (repeats) se odškrtne jen tenhle výskyt, další zůstává. Seznamy (kind list) neodškrtáváš, to je unsupported. Když nevíš, kterou myslí, je to unclear. answer je krátké potvrzení: „Dobře, zubař je hotový.“, u opakované „Dobře, dnešní cvičení je hotové.“
 - undo: vrátit poslední změnu („vrať to“, „to je špatně“).
 - end: loučí se, děkuje, nebo dává najevo, že už nic nechce („to je vše“, „takhle vše“, „zatím nic“, „stačí“, „konec“, „ahoj“, „dobrou noc“).
 - unclear: nevíš, kterou položku nebo jaký čas myslí. Zeptej se jednou krátkou větou.
 - unsupported: chce něco jiného (odškrtnout celý seznam, odškrtnout nebo smazat věc ze seznamu, založit nebo smazat seznam, poslat mail, změnit kalendář, cokoli dalšího), nebo položka nejde přesunout (can_move je false) či smazat (can_delete je false). Taky otázka na něco, co v datech nemáš: zprávy ze světa, obecné otázky, počasí dál než na zítřek (na zítřek je v brief.weather_tomorrow, to je info). Po pravdě řekni, že to zatím neumíš, a krátce proč.
+
+Mobil:
+- phone v datech říká, jestli appka Merora v mobilu převzala poslední změnu z rozhovoru: in_phone = je v mobilu a zazvoní, nic dělat nemusí; sending = právě se tam posílá; missing = mobil ji zatím nemá, ať otevře Meroru v telefonu. Bez phone se nic neměnilo. Na otázku o mobilu (je to v mobilu, proč mám otevřít appku) odpověz podle toho jako info. Otevřít appku raď jen u missing.
 
 Čas:
 - Hodiny bez dopoledne a odpoledne ber podle připomínky. „Ze druhé na třetí hodinu“ u připomínky ve 14:00 znamená 15:00.
@@ -270,12 +266,15 @@ Decide what should happen:
 - create: create a new reminder in Merora ("remind me…", "put in Merora…", "note down…"). task is the short reminder text the way ${they} would write it, without "remind me" ("Call dad"). when is local time YYYY-MM-DDTHH:MM, or empty when no time was said (then it goes to Anytime). A day without an hour is unclear. Never in the past.
 - add_to_list: add things to a list ${they} already has in Merora (lists in the data): "add bread to the shopping list", "put a present for mum on the Christmas list", "milk and butter to the shopping list". Only when ${they} says the word list or the name of the list, "buy bread" is create. list is the list id from the data. items are the separate things, each on its own, starting with a capital letter ("buy water" is "Water", "two milks" is "Two milks"). When ${they} doesn't say which list and one list clearly fits the things (bread to the shopping list), pick it, otherwise ask (unclear). You don't create lists ${they} doesn't have: that is unsupported, and say to create it in the Merora app.
 - delete: delete one reminder ("delete…", "cancel…", "remove…", "I don't need this anymore"). id exactly from items. Nothing is deleted right away: answer is a question whether to really delete it, with what and when ("Should I delete the dentist on Monday at ten?"). For a repeating one (repeats) ask whether just this one or the whole series ("The workout repeats. Should I delete just today's, or the whole series?"). When ${they} says yes to your question, or picks an option, return delete again with the same id, and for a repeating one with scope occurrence or series. When ${they} doesn't want it, return info with the answer "Okay, I'm keeping it.". Items with can_delete false (lists, linked tasks, calendar) you can't delete.
-- info: ${they} asks about reminders and events on any day (items are all open reminders from Merora: today, the next days, overdue, by place and Anytime, and events from the calendar for today and the next 7 days with source calendar), about what ${they} has already done (done are the latest completed and skipped), about something from today's summary (brief in the data), or what is on a list (lists in the data): what's on tomorrow, when is the dentist, what did I do yesterday, what mails do I have, what's the weather, what did you say. Calendar events matter as much as Merora reminders: for a question about a day or about what's ahead, take both together by time and never leave something out just because it's in the calendar. Say all-day ones (all_day) without a time. For a question about a whole day, say at most four things by time and how many more there are. Answer only from the data, never make anything up. All unread mails are in brief.inbox: subject, from whom (name or company), when, briefly what about and whether it's urgent. You don't know the full text of a mail. For "what other mails do I have" say at most three you haven't talked about yet, important ones first, and how many are left ("and five newsletters"). highlight is the id of the box or line you're talking about (mails, weather, the id of a tile or panel from brief, or a line id), otherwise empty.
+- info: ${they} asks about reminders and events on any day (items are all open reminders from Merora: today, the next days, overdue, by place and Anytime, and events from the calendar for today and the next 7 days with source calendar), about what ${they} has already done (done are the latest completed and skipped), about something from today's summary (brief in the data), or what is on a list (lists in the data): what's on tomorrow, when is the dentist, what did I do yesterday, what mails do I have, what's the weather, what did you say. Calendar events matter as much as Merora reminders: for a question about a day or about what's ahead, take both together by time and never leave something out just because it's in the calendar. Say all-day ones (all_day) without a time. For a question about a whole day, say at most four things by time and how many more there are. Answer only from the data, never make anything up. All unread mails are in brief.inbox (when it has received_last_two_days instead of unread, they are new mails from the last two days and you know nothing about what is read): subject, from whom (name or company), when, briefly what about and whether it's urgent. You don't know the full text of a mail. For "what other mails do I have" say at most three you haven't talked about yet, important ones first, and how many are left ("and five newsletters"). highlight is the id of the box or line you're talking about (mails, weather, the id of a tile or panel from brief, or a line id), otherwise empty.
 - complete: mark one reminder as done ("tick off the dentist", "the dentist is done", "I've done that", "calling dad is done"). id exactly from items and only with can_complete true. For a repeating one (repeats) only this occurrence is ticked off, the next one stays. Lists (kind list) you don't tick off, that is unsupported. When you don't know which one ${they} means, it is unclear. answer is a short confirmation: "Okay, the dentist is done.", for a repeating one "Okay, today's workout is done."
 - undo: undo the last change ("undo that", "that's wrong").
 - end: ${they} says goodbye, thanks you, or makes clear ${they} wants nothing more ("that's all", "that's it", "nothing else", "nothing for now", "enough", "stop", "bye", "good night").
 - unclear: you don't know which item or what time ${they} means. Ask one short question.
 - unsupported: ${they} wants something else (tick off a whole list, tick off or delete a thing on a list, create or delete a list, send a mail, change the calendar, anything else), or the item can't be moved (can_move is false) or deleted (can_delete is false). Also a question about something you don't have in the data: world news, general questions, weather beyond tomorrow (tomorrow is in brief.weather_tomorrow, that is info). Say truthfully that you can't do that yet, and briefly why.
+
+Phone:
+- phone in the data says whether the Merora app on the phone picked up the last change from the conversation: in_phone = it's on the phone and will ring, nothing to do; sending = it's being sent right now; missing = the phone doesn't have it yet, open Merora on the phone. No phone means nothing changed. Answer questions about the phone (is it on my phone, why should I open the app) from that as info. Only tell them to open the app when it's missing.
 
 Time:
 - Hours without morning or afternoon go by the reminder. "From two to three" for a reminder at 14:00 means 15:00.
@@ -318,6 +317,8 @@ export const SCHEMA = {
 // Jen ze zdrojů zapnutých teď, stejně jako okno. radky: box „Dnes“ po změnách v tomhle rozhovoru.
 // withMails: celá pošta (5 kB i víc) jen k otázce na maily, jinak jen počet. Rozhovor posílá data s každou větou.
 const unreadCount = (inbox) => (inbox.more ? `${english() ? 'more than' : 'víc než'} ${inbox.count}` : inbox.count);
+// Schránka, u které nejde poznat přečtené (Outlook): model nesmí mluvit o nepřečtených.
+const unreadKey = (inbox) => (inbox.unreadKnown === false ? 'received_last_two_days' : 'unread');
 function briefForDialog(lines = null, { withMails = true } = {}) {
   const d = bySettings(currentData());
   return {
@@ -332,17 +333,17 @@ function briefForDialog(lines = null, { withMails = true } = {}) {
     weather: d.weather ? { temperature: d.weather.temperature, precipitation: d.weather.precipitation ?? null } : null,
     // Předpověď na zítřek (Open-Meteo), ať Meri odpoví na „jaké bude zítra počasí“.
     weather_tomorrow: d.weather ? d.sourceData?.weather?.tomorrow ?? null : null,
-    inbox: d.inbox && !withMails ? { unread: unreadCount(d.inbox), mails: english() ? 'details come with a question about mails' : 'podrobnosti přijdou s otázkou na maily' } : d.inbox
+    inbox: d.inbox && !withMails ? { [unreadKey(d.inbox)]: unreadCount(d.inbox), mails: english() ? 'details come with a question about mails' : 'podrobnosti přijdou s otázkou na maily' } : d.inbox
       ? {
-          unread: unreadCount(d.inbox),
+          [unreadKey(d.inbox)]: unreadCount(d.inbox),
           mails: d.inbox.mails.map((m) => ({
             subject: m.subject,
             from: m.from,
             about: m.about,
             when: m.when,
             kind: (english()
-              ? { person: 'from a person', notifications: 'notification', news: 'newsletter or ad' }
-              : { person: 'od člověka', notifications: 'oznámení', news: 'newsletter nebo reklama' })[m.kind] ?? (english() ? 'unknown' : 'nevím'),
+              ? { person: 'from a person', notification: 'notification', news: 'newsletter or ad' }
+              : { person: 'od člověka', notification: 'oznámení', news: 'newsletter nebo reklama' })[m.kind] ?? (english() ? 'unknown' : 'nevím'),
             important: m.important,
             urgent: m.urgent,
             tester: m.tester,
@@ -711,8 +712,9 @@ export function quickMove(text, rows, now, topic = null) {
 // Věta, kde není sloveso, čas, položka ani nic o vrácení. Model s ní nic nesvede a čekalo by se na něj
 // i 10 s, typicky je to přeslechnutá řeč. Radši hned říct, že nerozuměla, a nechat ho zopakovat.
 const TO_THE_POINT = /^(pres|pos|prev|preh|pren|prel|odloz|zmen|dal$|vrat|zpet|zpatky|spatne|puvodn)/;
-// Otázky na shrnutí a nové připomínky: ty posoudí model, ne rychlá cesta, ani „nerozuměla jsem“.
-const QUESTION_OR_NEW = /^(pripom|zaloz|pridej|zapis|napis|vytvor|novou|seznam|nakup|kup|koup|dopln|kolik|co$|jak|jaky|jake|jaka|kdo|koho|kdy|ktery|ktere|ktera|mail|email|zprav|psal|psala|psali|pise|pisou|poslal|prisl|neprect|ostatn|dalsi|zbyl|zbytek|spech|dulezit|chyb|pocas|prsi|teplo|zima|tester|uzivatel|program|zopakuj|precti|rekni|shrn)/;
+// Otázky na shrnutí a nové připomínky: ty posoudí model, ne rychlá cesta, ani „nerozuměla jsem“. Taky otázky na mobil
+// („je to v mobilu?“, „proč mám otevřít appku?“), odpověď zná model z phone ve zprávě (26. 11.).
+const QUESTION_OR_NEW = /^(pripom|zaloz|pridej|zapis|napis|vytvor|novou|seznam|nakup|kup|koup|dopln|kolik|co$|jak|jaky|jake|jaka|kdo|koho|kdy|ktery|ktere|ktera|mail|email|zprav|psal|psala|psali|pise|pisou|poslal|prisl|neprect|ostatn|dalsi|zbyl|zbytek|spech|dulezit|chyb|pocas|prsi|teplo|zima|tester|uzivatel|program|zopakuj|precti|rekni|shrn|mobil|telefon|appk|aplikac|proc|zazvon|zvoni)/;
 export const isQuestionOrNew = (text) => toWords(text).some((w) => QUESTION_OR_NEW.test(w));
 
 export function isOffTopic(text, rows) {
@@ -894,6 +896,35 @@ export class Dialog {
 
   get speakingOrThinking() {
     return this.v?.status === 'speaking' || this.v?.status === 'thinking';
+  }
+
+  // Mobil změnu z rozhovoru nepřevzal (server.mjs watchPhone, Merora po 48 s hlásí `not_confirmed`): Meri to řekne
+  // nahlas sama od sebe (Riccardo 26. 11.: „nepovedlo se mi to nahrát do mobilu, otevři prosím mobilní
+  // aplikaci“). Server zkouší sayPhoneNotice, dokud nevyjde; mobil to mezitím může převzít (cancelPhoneNotice).
+  phoneMissed() {
+    if (!VIDEO) this.phoneNoticePending = true;
+  }
+
+  cancelPhoneNotice() {
+    this.phoneNoticePending = false;
+  }
+
+  // Stav mobilu pro model (phone ve zprávě): waiting | confirmed | not_confirmed | later z server.mjs setPhone.
+  phoneIs(status) {
+    this.phone = { waiting: 'sending', confirmed: 'in_phone', not_confirmed: 'missing', later: 'missing' }[status] ?? null;
+  }
+
+  // Řekne to hned, když může: rozhovor poslouchá a člověk zrovna nemluví (poslední rozpoznaný text před 2 s),
+  // nebo je rozhovor zavřený, pak ho na tu jednu větu otevře a zase zavře. Odpověď, přemýšlení a rozpracovaná
+  // věta mají přednost (false = zkusit znovu). Shrnutí a jeho chystání hlídá server.
+  sayPhoneNotice() {
+    if (!this.phoneNoticePending) return false;
+    if (this.v && (this.v.status !== 'listening' || Date.now() - this.lastText < 2000)) return false;
+    this.phoneNoticePending = false;
+    const open = Boolean(this.v);
+    this.stopTimer();
+    this.reply({ text: PHONE_MISSED(), fallback: PHONE_MISSED(), end: !open }, this.session);
+    return true;
   }
 
   setView(v) {
@@ -1090,6 +1121,7 @@ export class Dialog {
       ...(this.toDelete ? { asking_to_delete: `r${this.toDelete.r.id}` } : {}),
       // Kód někdy řekne něco jiného než model (otázka, chyba). Tohle opravdu zaznělo.
       you_said_last: this.lastSentence,
+      ...(this.phone ? { phone: this.phone } : {}),
       brief: briefForDialog(this.today, { withMails: wantsMails(text) }),
     });
   }
@@ -1234,7 +1266,7 @@ export class Dialog {
     this.toDelete = null;
     if (!VIDEO) {
       try {
-        await deleteReminder(r.id, scope);
+        await deleteReminder(r.id, scope, { rings: reminderRings(r), at: [r.date_time] });
       } catch (err) {
         console.error(`Dialog: ${err.message}`);
         return { text: err.sentence ?? DELETE_ERROR() };
@@ -1251,7 +1283,7 @@ export class Dialog {
     this.topic = null;
     const sentence = scope === 'series' ? DELETED_SERIES() : scope === 'occurrence' ? SKIPPED() : DELETED();
     const when = r.date_time ? new Date(r.date_time) : null;
-    return { text: withPhoneHint(sentence, when && when > this.now() ? when : null, { deleted: true }), fallback: sentence };
+    return { text: withPhoneHint(sentence, when && when > this.now() ? when : null), fallback: sentence };
   }
 
   // „Odškrtni…“: hned hotové, bez otázky (vrátit jde, na rozdíl od smazání nic nezmizí). U opakované jen
@@ -1262,7 +1294,7 @@ export class Dialog {
     if (!canComplete(r)) return { text: tr('dlg_wholeListNoComplete') };
     if (!VIDEO) {
       try {
-        await markDone(r.id);
+        await markDone(r.id, { rings: reminderRings(r), at: [r.date_time] });
       } catch (err) {
         console.error(`Dialog: ${err.message}`);
         return { text: err.sentence ?? COMPLETE_ERROR() };
@@ -1279,7 +1311,7 @@ export class Dialog {
     // Hotová připomínka, která měla brzy zvonit: telefon se to dozví tichou zprávou, jen kdyby appka spala, ať ji otevře.
     const when = r.date_time ? new Date(r.date_time) : null;
     const sentence = proposal.answer || COMPLETED();
-    return { text: withPhoneHint(sentence, when && when > this.now() ? when : null, { deleted: true }), fallback: COMPLETED() };
+    return { text: withPhoneHint(sentence, when && when > this.now() ? when : null), fallback: COMPLETED() };
   }
 
   // „Vrať to“ po odškrtnutí: zpátky mezi otevřené (`/unmark-done`, Merora ji propojeným aplikacím pouští od
@@ -1288,7 +1320,7 @@ export class Dialog {
     const { r, gone } = this.last;
     if (!VIDEO) {
       try {
-        await unmarkDone(r.id);
+        await unmarkDone(r.id, { rings: reminderRings(r), at: [r.date_time] });
       } catch (err) {
         console.error(`Dialog: ${err.message}`);
         if (err.status === 403) {
@@ -1329,7 +1361,7 @@ export class Dialog {
     const { r, line } = this.last;
     if (!VIDEO) {
       try {
-        await deleteReminder(r.id);
+        await deleteReminder(r.id, null, { rings: reminderRings(r), at: [r.date_time] });
       } catch (err) {
         console.error(`Dialog: ${err.message}`);
         return { text: err.sentence ?? UNDO_ERROR() };
@@ -1421,7 +1453,7 @@ export class Dialog {
     // Ve videu se změna odehraje jen na obrazovce. Do Merory ani do shrnutí nic nejde.
     if (!VIDEO) {
       try {
-        await moveReminder(r.id, destination);
+        await moveReminder(r.id, destination, { from: r.date_time });
       } catch (err) {
         console.error(`Dialog: ${err.message}`);
         this.writeError = err.sentence ?? null;

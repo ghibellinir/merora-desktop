@@ -3,7 +3,7 @@
 // Prázdný panel (žádná chyba, žádný mail) se neukáže, stačí jeho dlaždice s nulou.
 // Dlaždice mají vždycky aspoň třetinu šířky, jedna přes celou šířku by vypadala jako chyba.
 import {
-  Voice, Listener, Reaction, activeSentence, currentState, breath, dialogPost, esc, icon, hasSource, speaking, onState,
+  Voice, Listener, Reaction, activeSentence, currentState, breath, dialogPost, esc, icon, hasMail, hasSource, mailsPending, speaking, onState,
   loadAssets, reveal, controls, params, post, send, prepareImages, fitStage, startLoop, createNeuron, highlighter, onNewData,
 } from '/meri.js';
 import { settingsWindow, redraw } from '/settings.js';
@@ -69,11 +69,11 @@ const panelsOf = (data) => [
     panel(esc(p.id), p.icon, p.heading, p.items.map((x) => item(x.title, esc(x.meta ?? ''))))),
   data.errors?.length && !(data.panels ?? []).some((p) => p.id === 'chyby') &&
     panel('chyby', 'bug', t('newErrors'), data.errors.map((c) => item(c.title, esc(c.meta)))),
-  hasSource(data, 'gmail') && data.mails.length &&
+  hasMail(data) && data.mails.length &&
     panel('mails', 'mail', `${data.mailsHeading ?? t('importantMails')}${data.importantMails > data.mails.length ? ` · ${t('mailsOf', { shown: data.mails.length, total: data.importantMails })}` : ''}`, data.mails.map((m) =>
       item(m.subject, `<span>${esc(m.who)}</span><span class="label ${esc(m.tone)}">${esc(m.label)}</span>`))),
   // Maily dneška se teprve načítají: panel má místo včerejších mailů kolečko.
-  hasSource(data, 'gmail') && data.day !== 'tomorrow' && data.pending?.includes('gmail') &&
+  hasMail(data) && !data.mails.length && data.day !== 'tomorrow' && mailsPending(data) &&
     panel('mails', 'mail', data.mailsHeading ?? t('importantMails'), [`<div class="loading-note"><span class="spinner"></span>${t('loading')}</div>`]),
 ].filter(Boolean);
 const clock = () => new Date().toLocaleTimeString(locale(), { hour: 'numeric', minute: '2-digit' });
@@ -448,8 +448,9 @@ stage.addEventListener('click', (e) => {
   if (b && b.getAttribute('aria-pressed') !== 'true') send({ cmd: 'day', day: b.dataset.day });
 });
 
-// Převzal telefon změnu z počítače (server se po zápisu ptá Merory)? „V telefonu ✓“ zmizí po pár vteřinách,
-// rada otevřít Meroru zůstane dvě minuty, nebo do další změny.
+// Převzal telefon změnu z počítače (server se po zápisu ptá Merory, server.mjs watchPhone)? Zelené „V mobilu ✓“
+// zmizí po pár vteřinách, šedé „ukáže se, až ho otevřeš“ po 20 s. Varování drží, dokud ho server nezmění:
+// po převzetí na zelenou, po další změně znovu od začátku.
 const phoneEl = $('phone-status');
 let phoneHide = null;
 function showPhone(p) {
@@ -458,9 +459,10 @@ function showPhone(p) {
     waiting: ['waiting', t('phoneWaiting')],
     confirmed: ['ok', t('phoneConfirmed')],
     not_confirmed: ['warn', t('phoneNotConfirmed')],
+    later: ['quiet', t('phoneLater')],
   };
   const [kind, text] = texts[p?.status] ?? [];
-  const keep = p?.status === 'confirmed' ? 6000 : p?.status === 'not_confirmed' ? 120_000 : null;
+  const keep = p?.status === 'confirmed' ? 6000 : p?.status === 'later' ? 20_000 : null;
   const left = keep ? p.at + keep - Date.now() : 1;
   if (!kind || left <= 0) {
     phoneEl.classList.remove('visible');

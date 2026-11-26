@@ -26,6 +26,7 @@ async function runOne(file) {
   const { prepareReminders } = await import('./sources/merora.mjs');
   const { prepareCalendar } = await import('./sources/calendar.mjs');
   const { prepareMails } = await import('./sources/gmail.mjs');
+  const { inboxOf, importantMail, MAIL_SOURCES } = await import('./mail.mjs');
   const { isSpeakable } = await import('./sources/index.mjs');
   const { BRIEF_LENGTHS, getBriefLength, profile, shouldMentionRings, language } = await import('./settings.mjs');
   const { MAX_LINES, MAX_BOX } = await import('./lines.mjs');
@@ -56,9 +57,11 @@ async function runOne(file) {
   if ('merora' in z) sourceData.merora = z.merora === null ? null : prepareReminders(rows, now);
   if ('calendar' in z) sourceData.calendar = z.calendar === null ? null : prepareCalendar(z.calendar);
   if ('weather' in z) sourceData.weather = z.weather;
-  if ('gmail' in z) {
-    sourceData.gmail = z.gmail === null ? null : prepareMails({ ...z.gmail, mails: z.gmail.mails.map((m) => ({ ...m, when: instant(m.when).toISOString() })) }, now);
+  for (const id of MAIL_SOURCES.filter((x) => x in z)) {
+    const { unreadKnown, ...box } = z[id] ?? {};
+    sourceData[id] = z[id] === null ? null : { ...prepareMails({ ...box, mails: box.mails.map((m) => ({ ...m, src: id, when: instant(m.when).toISOString() })) }, now), ...(unreadKnown === false ? { unreadKnown } : {}) };
   }
+  const inbox = inboxOf(sourceData);
 
   const checks = [];
   const check = (title, ok, detail = '') => checks.push({ title, ok: Boolean(ok), detail });
@@ -110,8 +113,10 @@ async function runOne(file) {
     check(`zmíní: ${what}`, words.some((s) => spoken.includes(plain(s))));
   }
   // Panel s maily ukazuje všechny důležité (nejvýš 4), ať sedí s číslem na dlaždici.
-  if (sourceData.gmail) {
-    const important = sourceData.gmail.mails.filter((m) => m.important || m.urgent || m.tester).length;
+  if (inbox) {
+    const important = inbox.mails.filter(importantMail).length;
+    // Schránka, u které nejde poznat přečtené: nic o nepřečtených.
+    if (inbox.unreadKnown === false) check('neříká „nepřečtené“, když to neví', !/nepřečten|unread/i.test([...sentences, ...brief.tiles.map((t) => t.title)].join(' ')));
     check(`panel ukazuje důležité maily (${Math.min(important, 4)})`, brief.mails.length === Math.min(important, 4), `${brief.mails.length}`);
   }
   for (const id of o.inBox ?? []) check(`v boxu Dnes: ${id}`, inBox.has(id));
@@ -128,7 +133,8 @@ async function runOne(file) {
     ? [...z.calendar.map((e) => ({ day: today, title: e.title, time: e.time ?? null })), ...(z.calendarAhead ?? [])]
     : null;
   const calendar = calendarForDialog(events, brief.today.filter((r) => r.id.startsWith('k')), now);
-  for (const { say, action, id, answerMentions } of person.conversation ?? []) {
+  const unreadKey = brief.inbox?.unreadKnown === false ? 'received_last_two_days' : 'unread';
+  for (const { say, action, id, answerMentions, answerNotMentions } of person.conversation ?? []) {
     const briefForModel = {
       today: brief.today.map((r) => ({ id: r.id, title: r.title, time: r.time ?? null, meta: r.meta ?? '' })),
       tiles: brief.tiles.map((p) => ({ id: p.id, title: p.title, value: p.value, caption: p.caption })),
@@ -138,8 +144,8 @@ async function runOne(file) {
       weather_tomorrow: brief.weather ? sourceData.weather?.tomorrow ?? null : null,
       inbox: brief.inbox
         ? wantsMails(say)
-          ? { unread: brief.inbox.count, mails: brief.inbox.mails }
-          : { unread: brief.inbox.count, mails: language() === 'en' ? 'details come with a question about mails' : 'podrobnosti přijdou s otázkou na maily' }
+          ? { [unreadKey]: brief.inbox.count, mails: brief.inbox.mails }
+          : { [unreadKey]: brief.inbox.count, mails: language() === 'en' ? 'details come with a question about mails' : 'podrobnosti přijdou s otázkou na maily' }
         : null,
       you_said: sentences,
     };
@@ -159,7 +165,9 @@ async function runOne(file) {
         schema: SCHEMA,
         prompt: JSON.stringify(message),
       });
-      const mentioned = !answerMentions || answerMentions.some((w) => plain(proposal.answer).includes(plain(w)));
+      const mentioned =
+        (!answerMentions || answerMentions.some((w) => plain(proposal.answer).includes(plain(w)))) &&
+        !(answerNotMentions ?? []).some((w) => plain(proposal.answer).includes(plain(w)));
       const ok = action.includes(proposal.action) && (!id || proposal.id === id) && mentioned;
       conversation.push({ say, proposal: `${proposal.action}${proposal.id ? ` ${proposal.id}` : ''}: „${proposal.answer}“` });
       check(`rozhovor „${say}“ → ${action.join(' / ')}${id ? ` ${id}` : ''}`, ok, `${proposal.action}${proposal.id ? ` ${proposal.id}` : ''}`);

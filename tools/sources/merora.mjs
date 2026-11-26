@@ -3,36 +3,41 @@
 // v Claudovi, čte přes něj.
 import { listConnectors, callTool } from '../ai.mjs';
 import { timeOf, dayOf, pastWhenForScreen } from '../time.mjs';
-import { hasOAuth, fetchReminders, directAvailable } from '../merora.mjs';
+import { hasOAuth, fetchReminders, directAvailable, connectionEnded } from '../merora.mjs';
 import { showYesterday, ownRules } from '../settings.mjs';
 import { tr } from '../i18n.mjs';
 import { notConnected } from './not-connected.mjs';
 
-export const MERORA_MCP = 'https://hvormybwggtfgiohmidh.supabase.co/functions/v1/mcp';
+// Veřejná adresa MCP Merory. Kdo ji v Claudovi propojil dřív, má konektor na původní adrese, platí obě.
+export const MERORA_MCP = 'https://mcp.merora.app/mcp';
+const MERORA_ADDRESSES = ['https://mcp.merora.app', 'https://hvormybwggtfgiohmidh.supabase.co/functions/v1/mcp'];
 
 // Konektor Merory podle adresy. Null, když v Claudovi propojený není.
 async function meroraConnector(again = false) {
-  return (await listConnectors({ again })).find((k) => k.address.startsWith(MERORA_MCP)) ?? null;
+  return (await listConnectors({ again })).find((k) => MERORA_ADDRESSES.some((a) => k.address.startsWith(a))) ?? null;
 }
 
 // Co uživateli chybí k propojení (text do úvodu a nastavení), nebo null. cist: zkusit i přečíst připomínku,
 // to jediné pozná, že chybí Merora Pro. Výsledek se pamatuje pro nastavení, hledání trvá pár vteřin.
 let lastCheck = null;
 export async function checkMerora({ read = false } = {}) {
+  // Propojená s účtem: konektor se nezkouší, takže po odpojení neplatí nic z dřívějška (řádek hlásil „Přes konektor“).
+  if (directAvailable()) {
+    lastCheck = null;
+    return null;
+  }
   let problem = null;
-  if (!directAvailable()) {
-    const connector = await meroraConnector(read);
-    if (!connector) problem = tr('meroraNotLinkedButton');
-    else if (connector.status === 'needs_login') problem = tr('meroraLoginClaude');
-    else if (connector.status !== 'ok') problem = tr('meroraConnectorDown');
-    else if (read) {
-      try {
-        await callTool({ tool: `${connector.prefix}list_reminders`, extraArgs: { view: 'today', limit: 1 } });
-      } catch (err) {
-        problem = /Merora Pro/.test(err.message)
-          ? tr('meroraProMissing')
-          : tr('meroraReadFailed');
-      }
+  const connector = await meroraConnector(read);
+  if (!connector) problem = tr('meroraNotLinkedButton');
+  else if (connector.status === 'needs_login') problem = tr('meroraLoginClaude');
+  else if (connector.status !== 'ok') problem = tr('meroraConnectorDown');
+  else if (read) {
+    try {
+      await callTool({ tool: `${connector.prefix}list_reminders`, extraArgs: { view: 'today', limit: 1 } });
+    } catch (err) {
+      problem = /Merora Pro/.test(err.message)
+        ? tr('meroraProMissing')
+        : tr('meroraReadFailed');
     }
   }
   lastCheck = { problem };
@@ -156,7 +161,7 @@ export default {
   // Co se počítá za změnu v Meroře: text, čas, místo, opakování, štítek a seznam. Ne to, co se mění
   // jen s časem (druh, „zazvonilo“), jinak by se shrnutí přepisovalo, i když se v Meroře nic nestalo.
   fingerprint: (items) => items.map((z) => [z.id, z.text, z.sortKey, z.place ?? null, z.direction ?? null, z.repeat ?? null, z.label ?? null, z.steps ?? null]),
-  problem: () => (directAvailable() ? null : lastCheck ? lastCheck.problem : tr('meroraNotLinked')),
+  problem: () => (directAvailable() ? (connectionEnded() ? tr('meroraEnded') : null) : lastCheck ? lastCheck.problem : tr('meroraNotLinked')),
   check: (options) => checkMerora(options),
   collect: async ({ now }) => prepareReminders(await load(), now),
 };

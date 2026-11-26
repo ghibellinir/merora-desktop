@@ -26,16 +26,24 @@ Všechno jde i později v nastavení (ozubené kolečko vpravo nahoře, ukáže 
 
 **Aktualizace:** Merora Desktop se jednou denně podívá na GitHub, jestli je nová verze. Když ano, nahoře v okně se ukáže **Nová verze … · Co je nového** a v nastavení v části O aplikaci co je nového a tlačítko **Aktualizovat**. To stáhne novou verzi (při instalaci přes git posune složku na nové vydání, jinak rozbalí archiv vydání) a Merora se sama restartuje, okno se načte znovu. Klíče, nastavení a data zůstávají. Kdo má ve složce vlastní úpravy, dostane jen upozornění, ať aktualizuje ručně (`git pull`).
 
-- **Merora:** v úvodu nebo v nastavení u Merory klikni na **Propojit s účtem Merora**. V prohlížeči se otevře stránka Merory s QR kódem, naskenuješ ho telefonem a propojení potvrdíš v appce Merora. Okno Merory to pak samo pozná a načte nová data. Merora Desktop najdeš v appce v Nastavení › Připojené aplikace, kde jde odpojit, a změny z počítače telefon dostane hned. Opačně taky: připomínka přidaná nebo smazaná v telefonu (nebo přes Clauda) se v okně ukáže hned, protože Merora dá Desktopu o každé změně vědět, a kdyby zpráva nedošla, nejpozději do minuty (volba Merora hned po změně v nastavení). Číst jde s každým účtem, měnit s Merora Pro.
+- **Merora:** v úvodu nebo v nastavení u Merory klikni na **Propojit s účtem Merora**. V prohlížeči se otevře stránka Merory s QR kódem, naskenuješ ho telefonem a propojení potvrdíš v appce Merora. Stránka pak ukáže zelené **Propojeno** a můžeš ji zavřít, okno Merory to samo pozná a načte nová data. Merora Desktop najdeš v appce v Nastavení › Připojené aplikace, kde jde odpojit, a změny z počítače telefon dostane hned. Opačně taky: připomínka přidaná nebo smazaná v telefonu (nebo přes Clauda) se v okně ukáže hned, protože Merora dá Desktopu o každé změně vědět, a kdyby zpráva nedošla, nejpozději do minuty (volba Merora hned po změně v nastavení). Číst jde s každým účtem, měnit s Merora Pro.
 - **Gmail:** v Claudovi Nastavení › Konektory › Gmail. Meri v něm jen hledá a čte, nic nepošle, nesmaže ani neoznačí jako přečtené.
-- **Kalendář:** odkaz na kalendář ve formátu iCal (ICS) vlož v úvodu nebo v nastavení u Kalendáře. Merora ho před uložením zkusí načíst a později ho jde změnit nebo odpojit. Kdo odkaz má, vidí kalendář, tak ho nikomu neposílej.
-  - Google: Kalendář na webu › Nastavení › tvůj kalendář › Tajná adresa ve formátu iCal.
-  - Apple (iCloud): v appce Kalendář na Macu pravým na kalendář › Sdílet kalendář › zaškrtni Veřejný kalendář › zkopíruj odkaz (začíná webcal://). Na iCloud.com totéž přes ikonu sdílení u kalendáře.
-  - Outlook: Outlook.com › Nastavení › Kalendář › Sdílené kalendáře › Publikovat kalendář › Může zobrazit všechny podrobnosti › Publikovat › odkaz ICS. U firemního účtu to může mít správce vypnuté.
+- **Outlook:** na claude.ai v prohlížeči Nastavení › Konektory › Microsoft 365, přihlas se osobním (Outlook.com, Hotmail, Live) nebo pracovním účtem. Pak v Meroře v nastavení v části Propojení zapni Outlook a klikni na Zkontrolovat. Meri v něm jen hledá, mail neotvírá, nic nepošle ani nesmaže. Maily z Gmailu a Outlooku ukazuje dohromady.
+- **Jiný mailový účet:** účet se vybírá v Claudovi. U konektoru ho odpoj a připoj znovu s jiným, v Meroře pak zmáčkni R.
+- **Kalendář:** Google, Apple, Outlook a každý další, který umí odkaz ve formátu iCal. Postup je níž v části [Kalendář](#kalendář).
 - **Počasí:** stačí město v úvodu nebo v nastavení. Bez města se počasí neukazuje a Meri o něm nemluví.
 - **Hlas:** založ si účet u [ElevenLabs](https://elevenlabs.io) (Starter stačí), vytvoř API klíč s právy na Text to Speech a Voices a vlož ho v úvodu nebo v nastavení. Meri pak mluví svým hlasem: česky Jana, anglicky Hope (obě z ElevenLabs). Hlas se přepne s jazykem. Kredity stojí jen věty, které si opravdu pustíš: data se načítají bez hlasu a namluví se, až si shrnutí pustíš. Hlas vypneš a zapneš i reproduktorem vlevo nahoře.
 
 Klíče a odkazy zůstávají jen na tvém počítači (soubor `.env` ve složce Merora Desktop), nastavení v `~/.meri/settings.json`.
+
+### Kalendář
+
+Kalendář se propojuje odkazem ve formátu iCal (ICS). Vlož ho v úvodu nebo v nastavení u Kalendáře. Merora ho před uložením zkusí načíst a později ho jde změnit nebo odpojit. Propojit jde jeden kalendář a čte se z něj jen název a čas událostí. Kdo odkaz má, vidí kalendář, tak ho nikomu neposílej.
+
+- **Google:** Kalendář na webu › Nastavení › tvůj kalendář › Tajná adresa ve formátu iCal.
+- **Apple (iCloud):** v appce Kalendář na Macu pravým na kalendář › Sdílet kalendář › zaškrtni Veřejný kalendář › zkopíruj odkaz (začíná webcal://). Na iCloud.com totéž přes ikonu sdílení u kalendáře.
+- **Outlook:** Outlook.com › Nastavení › Kalendář › Sdílené kalendáře › Publikovat kalendář › Může zobrazit všechny podrobnosti › Publikovat › odkaz ICS. U firemního účtu to může mít správce vypnuté.
+- **Jiný kalendář:** v jeho nastavení hledej sdílení odkazem ve formátu iCal (ICS). Začíná https:// nebo webcal://.
 
 ## Jak se používá
 
@@ -78,7 +86,7 @@ Na otázky typu „co mě čeká zítra“ odpovídá z Merory i z kalendáře n
 - **přesunout připomínku:** „přesuň mi natáčení na třetí hodinu“, „vrať to“;
 - **založit novou připomínku:** „připomeň mi zítra v devět zavolat mámě“, „vrať to“ ji zase smaže;
 - **smazat připomínku:** „smaž zubaře“. Meri se nejdřív zeptá („Mám smazat zubaře v pondělí v deset?“) a smaže až po „ano“, u opakované se zeptá, jestli jen tuhle, nebo celé opakování. „Vrať to“ smazanou jednorázovou založí znovu. Seznamy a navázané úkoly se mažou jen v appce;
-- **po každé změně z počítače** (přesun, nová, smazaná, odškrtnutá) se nad mikrofonem ukáže, jestli ji telefon převzal: „Posílám do telefonu…“, pak „V telefonu ✓“. Když ji telefon nepřevezme (appka v mobilu vyhozená z přepínače), Meri napíše „Telefon změnu nepřevzal, otevři Meroru v mobilu“ a telefonu přijde upozornění, ať Meroru otevřeš;
+- **po každé změně z počítače** (přesun, nová, smazaná, odškrtnutá) se nad mikrofonem ukáže, jestli ji mobil převzal: „Zapisuju do mobilu…“, pak zelené „V mobilu ✓“ a nic víc. Když ji mobil do 48 s nepřevezme (třeba appka vyhozená z přepínače) a jde o připomínku, která zvoní, Meri to řekne nahlas („Nepovedlo se mi to dostat do mobilu. Otevři prosím Meroru v telefonu.“), i když už rozhovor skončil, a mobilu přijde upozornění, ať Meroru otevřeš. U připomínky, která zvoní do 3 minut, se Meri ozve už po 20 s. Varování v okně drží, dokud mobil změnu nepřevezme, pak zezelená. U věci bez času nebo v seznamu Meri nic neříká, okno jen šedě napíše, že se to ukáže po otevření appky. Otevřít appku radí jen podle toho, jestli mobil změnu opravdu nemá, a na „je to v mobilu?“ odpoví podle skutečného stavu;
 - **odškrtnout připomínku:** „odškrtni zubaře“, „volání tátovi je hotové“. Meri ji hned označí jako hotovou (u opakované jen dnešní výskyt) a z plánu dne zmizí, telefon to dostane hned. Celý seznam neodškrtává. „vrať to“ ji vrátí mezi otevřené a zpátky do plánu dne (jako Vrátit v Hotových v appce);
 - **přidat do seznamu, který v Meroře máš:** „přidej do nákupního seznamu chleba a máslo“, „dej na seznam Vánoce dárek pro mámu“, „vrať to“, a zeptat se, co v něm je. Pravidla jsou stejná jako u hlasu v appce Merora: do seznamu jen se slovem seznam nebo jeho jménem („kup lepenku“ je připomínka), co tam už je, se podruhé nepřidá, odškrtnutá věc se znovu otevře. Nový seznam Meri nezakládá, ten si založ v appce;
 - **zopakovat:** „zopakuj mi to poslední“, „co jsi říkala?“ zopakuje poslední odpověď (hned po shrnutí jeho poslední větu), „zopakuj to od začátku“ pustí znovu celé shrnutí;
@@ -129,6 +137,7 @@ Restart serveru po změně kódu na Macu: `launchctl kickstart -k gui/$(id -u)/a
 | Kalendář (`calendar`) | dnešní události, jen název a čas, obnova zhruba každou čtvrthodinu | tajný odkaz iCal, uložený jako `GOOGLE_CALENDAR_ICAL` v `.env` | zapnutý |
 | Počasí (`weather`) | teplota a šance na srážky z Open-Meteo (CC-BY 4.0), obnova zhruba každou čtvrthodinu | bez klíče, město z nastavení, bez města se neukazuje | zapnutý |
 | Gmail (`gmail`) | nepřečtené maily za 7 dní v Doručené poště bez Propagace, Sociálních sítí, Fór a hromadné pošty (odkaz na odhlášení, newsletter, přehled; s hvězdičkou nebo označené jako důležité zůstanou): kolik jich je, co spěchá a co je důležité, ostatní na doptání | konektor Gmail v Claudovi, jen hledání a čtení vláken | zapnutý |
+| Outlook (`outlook`) | nové maily z Doručené pošty za 7 dní přes konektor Microsoft 365 (výchozí vypnutý): předmět, odesílatel a náhled z hledání, bez otevření mailu. Jen nepřečtené, když je konektor pozná, jinak za poslední dva dny |
 
 Konektory se hledají podle adresy serveru v `claude mcp list` (každý si je může pojmenovat jinak) a výsledek nástroje se čte přímo z proudu událostí Claude Code (`withTool` a `callTool` v `tools/ai.mjs`), ne z převyprávění modelem. Zdroj, který není propojený (kalendář bez odkazu, počasí bez města, Gmail nebo Merora bez propojení), se vynechá jako vypnutý: bez dlaždice a Meri o něm nemluví. Zdroj, který selže, se přeskočí a v nastavení je u něj „Minule se nenačetl“; shrnutí nevznikne, jen když selžou všechny. Každý zdroj je jeden modul v `tools/sources/` (tvar popisuje `tools/sources/index.mjs`), volby jdou přepsat v `~/.meri/settings.json`, třeba `"gmail": { "enabled": false }`.
 

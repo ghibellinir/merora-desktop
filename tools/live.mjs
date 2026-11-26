@@ -7,6 +7,7 @@ import { safeTitle, isSpeakable, weatherForScreen, withDayTiles, mailBoxes, comp
 import { shorten, sortLines, insertLine } from './lines.mjs';
 import { tr } from './i18n.mjs';
 import { fingerprintForSentences, sourceFingerprint } from './sources/index.mjs';
+import { inboxOf, isMail, mailCounts } from './mail.mjs';
 
 // Řádky zdroje v boxu: r… Merora, k… kalendář. Kalendář má id podle pořadí (po nové události se posunou),
 // proto se páruje podle názvu a času.
@@ -74,12 +75,13 @@ export function rewriteLines(today, id, old, created) {
 // Zítřek po novém načtení mailů dneška (Riccardo 23. 11.: Dnes ukazovalo 6 mailů a Zítra 5, zítřek měl kopii
 // z doby, kdy vznikl). Přepočítá se dlaždice a panel Maily na zítřek, bez Clauda. Jen u zítřka: dnešek má maily
 // ze sběru. Věty zítřka zůstávají, přepíšou se s dalším načtením zítřka.
-function mailsForTomorrow(brief, data, now) {
+function mailsForTomorrow(brief, id, data, now) {
   if (brief.day !== 'tomorrow' || data === undefined) return null;
-  if (JSON.stringify(brief.sourceData?.gmail ?? null) === JSON.stringify(data)) return null;
-  const box = mailBoxes(data, [], now, { tomorrow: true });
+  if (JSON.stringify(brief.sourceData?.[id] ?? null) === JSON.stringify(data)) return null;
+  const sourceData = { ...brief.sourceData, [id]: data };
+  const box = mailBoxes(inboxOf(sourceData), [], now, { tomorrow: true });
   const tiles = brief.tiles.some((d) => d.id === 'mails') ? brief.tiles.map((d) => (d.id === 'mails' ? box.tile : d)) : brief.tiles;
-  return { ...brief, sourceData: { ...brief.sourceData, gmail: data }, tiles, mails: box.mails, importantMails: box.count, mailsHeading: box.heading };
+  return { ...brief, sourceData, tiles, mails: box.mails, importantMails: box.count, mailsHeading: box.heading, mailCounts: mailCounts(sourceData) };
 }
 
 // Co se mění jen s časem, i když se v Meroře ani v kalendáři nic nezměnilo (Riccardo 23. 11.: připomínka
@@ -98,7 +100,9 @@ function byTime(brief, id, data, now) {
 
 // Den, který se teprve načítá (tools/pending.mjs), dostal data dalšího zdroje: složí se znovu z toho, co už je, a co
 // ještě není, má dál kolečko. data null: zdroj se nenačetl. data undefined: zdroj už propojený není, z okna zmizí.
-const CORE_TILE = { merora: 'reminders-count', calendar: 'calendar-count', gmail: 'mails' };
+const CORE_TILE = { merora: 'reminders-count', calendar: 'calendar-count', gmail: 'mails', outlook: 'mails' };
+// Dlaždice zdroje, který z okna odchází. Maily mají jednu pro všechny schránky: zůstane, dokud je aspoň jedna další.
+const tileLeaves = (d, id, sources) => (d.id === CORE_TILE[id] && !(isMail(id) && sources.some((x) => x !== id && isMail(x)))) || d.source === id;
 export function fillPending(brief, id, data, now = new Date()) {
   const tomorrow = brief.day === 'tomorrow';
   const pending = brief.pending.filter((x) => x !== id);
@@ -107,11 +111,13 @@ export function fillPending(brief, id, data, now = new Date()) {
       ...brief,
       pending,
       sources: brief.sources.filter((x) => x !== id),
-      tiles: brief.tiles.filter((d) => d.id !== CORE_TILE[id] && d.source !== id),
+      tiles: brief.tiles.filter((d) => !tileLeaves(d, id, brief.sources)),
       weather: id === 'weather' ? null : brief.weather,
     };
   }
   const sourceData = { ...brief.sourceData, [id]: data };
+  // Číslo mailů až se všemi schránkami, jinak by poskočilo. Panel ukáže, co už je.
+  const mailsWait = pending.some(isMail);
   const fresh = composeBrief({ today: [], mails: [], sentences: [] }, sourceData, now, { tomorrow });
   return {
     ...brief,
@@ -121,7 +127,7 @@ export function fillPending(brief, id, data, now = new Date()) {
     // Řádky skládá jen Merora a kalendář: maily a doplňky nesmí vrátit, co se mezitím změnilo v rozhovoru.
     today: MATCHING[id] ? fresh.today : brief.today,
     weather: fresh.weather ?? brief.weather,
-    tiles: brief.tiles.map((d) => fresh.tiles.find((x) => x.id === d.id) ?? d),
+    tiles: brief.tiles.map((d) => (d.id === 'mails' && mailsWait ? d : fresh.tiles.find((x) => x.id === d.id) ?? d)),
     mailsHeading: fresh.mailsHeading ?? brief.mailsHeading,
     sourceData,
     sentencesFingerprint: null,
@@ -141,7 +147,7 @@ export function withoutSource(brief, id) {
     ...(brief.pending ? { pending: brief.pending.filter((x) => x !== id) } : {}),
     sourceData,
     today: MATCHING[id] ? brief.today.filter((r) => !MATCHING[id].belongs(r)) : brief.today,
-    tiles: brief.tiles.filter((d) => d.id !== CORE_TILE[id] && d.source !== id),
+    tiles: brief.tiles.filter((d) => !tileLeaves(d, id, brief.sources)),
     weather: id === 'weather' ? null : brief.weather,
   };
 }
@@ -151,7 +157,7 @@ export function withoutSource(brief, id) {
 export function rewriteSource(brief, id, data, now = new Date()) {
   if (brief.sample || !(brief.sources ?? []).includes(id)) return null;
   if (brief.pending?.includes(id)) return fillPending(brief, id, data, now);
-  if (id === 'gmail') return mailsForTomorrow(brief, data, now);
+  if (isMail(id)) return mailsForTomorrow(brief, id, data, now);
   const old = brief.sourceData?.[id];
   if (brief.sourceData && sourceFingerprint(id, old) === sourceFingerprint(id, data)) return byTime(brief, id, data, now);
   const fresh = {

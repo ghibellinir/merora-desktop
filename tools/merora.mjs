@@ -55,6 +55,10 @@ export const oauthAvailable = () => Boolean(OAUTH_CLIENT);
 // Propojená s účtem Merora: čte a mění přímo a změny telefon hned dostane.
 export const hasOAuth = () => existsSync(OAUTH);
 export const isLoggedIn = hasOAuth;
+// Merora přístup odmítla (odebraný v appce v telefonu, nebo už nejde obnovit). Platí, dokud požadavek neprojde nebo se
+// nepropojí znovu. Okno podle toho nabídne propojit znovu a netvrdí, že je propojeno.
+let refused = false;
+export const connectionEnded = () => hasOAuth() && refused;
 // Bez propojení čte zdroj Merora přes konektor v Claudovi, když ho tam má. MERI_MERORA=connector to vynutí.
 export const directAvailable = () => process.env.MERI_MERORA !== 'connector' && hasOAuth();
 
@@ -117,6 +121,7 @@ export async function finishConsent({ code, state }) {
     if (!code) throw new Error(tr('meroraNoCode'));
     const tokens = await oauthToken({ grant_type: 'authorization_code', code, redirect_uri: OAUTH_REDIRECT, code_verifier: pendingRequest.verifier });
     saveToken(OAUTH, tokens);
+    refused = false;
   } catch (err) {
     throw Object.assign(err, { errorCode: 'failed' });
   }
@@ -139,6 +144,7 @@ export function oauthAccount() {
 // Odpojit na tomhle počítači: tokeny pryč. Úplně se Merora Desktop odebere v appce Merora (Připojené aplikace).
 export function disconnectOAuth() {
   rmSync(OAUTH, { force: true });
+  refused = false;
 }
 
 // Platný přístupový token. Obnova jen jedna najednou: obnovovací token se točí a platí jednou.
@@ -155,6 +161,7 @@ async function accessToken() {
       return fresh.access_token;
     } catch (err) {
       if (err.status === 400 || err.status === 401) {
+        refused = true;
         throw new Error(tr('meroraConnectionEnded'));
       }
       throw err;
@@ -180,9 +187,26 @@ export async function realtimeAuth() {
 // překrylo, může vrátit stav před ním (remindersWithoutWrites).
 let writeCount = 0;
 let writesInFlight = 0;
+// Kolik z nich se týkalo připomínky, která zvoní (čas nebo místo, před změnou nebo po ní), stejně jako
+// `changeRings` v backendu Merory: jen k takové změně pošle Merora do mobilu „Otevři mě“ a jen o ní Meri řekne
+// nahlas, že ji mobil nemá (server.mjs watchPhone). Když to volající neví, počítá se, že zvoní.
+let ringingWrites = 0;
+// Nejbližší čas, kdy taková změna zvoní (nová, přesunutá: nový i starý čas, smazaná, odškrtnutá). U brzkého zvonění
+// Meri nečeká na 48 s Merory (server.mjs watchPhone). Bere si ho server (takeSoonestRing).
+let soonestRing = null;
+export function takeSoonestRing() {
+  const at = soonestRing;
+  soonestRing = null;
+  return at;
+}
+const ringTime = (v) => {
+  const d = v ? new Date(v) : null;
+  return d && !Number.isNaN(d.getTime()) ? d : null;
+};
 
 // Kolik zápisů do Merory odsud zatím proběhlo. Server podle toho pozná nový zápis a zeptá se telefonu.
 export const writesSoFar = () => writeCount;
+export const ringingWritesSoFar = () => ringingWrites;
 
 // Převzal telefon poslední změnu? (`GET /devices/status`, jen čtení, Merora ho pouští propojeným aplikacím od
 // 22. 11.). Vrací { phone: no_device | idle | confirmed | waiting | not_confirmed, changed_at, synced_at, warned_at }.
@@ -190,10 +214,12 @@ export const phoneStatus = () => request('GET', '/devices/status');
 
 // Požadavek na backend Merory pod tvým účtem, stejný jako z appky. Chyba má i krátkou větu pro rozhovor
 // (veta), když se dá říct víc než „nepovedlo se“.
-async function request(method, route, body) {
+async function request(method, route, body, { rings = true, at = [] } = {}) {
   const changes = method !== 'GET' && route !== '/check-for-reminders';
   if (changes) {
     writeCount += 1;
+    if (rings) ringingWrites += 1;
+    for (const d of (rings ? at : []).map(ringTime).filter((d) => d && d > Date.now())) if (!soonestRing || d < soonestRing) soonestRing = d;
     writesInFlight += 1;
   }
   try {
@@ -218,6 +244,7 @@ async function callIt(method, route, body) {
   });
   // Smazání vrací prázdnou odpověď.
   if (res.ok) {
+    refused = false;
     const text = await res.text();
     return text ? JSON.parse(text) : null;
   }
@@ -226,6 +253,7 @@ async function callIt(method, route, body) {
   // 401: Merora Desktop odebraná v appce (Nastavení › Připojené aplikace). Token tím přestane platit hned, ne až
   // po vypršení, takže se to musí poznat i tady, nejen při obnově tokenu.
   const ended = res.status === 401;
+  if (ended) refused = true;
   const error = new Error(
     withoutPro
       ? tr('meroraNeedsPro')
@@ -240,9 +268,12 @@ async function callIt(method, route, body) {
   throw error;
 }
 
+// Zvoní připomínka (řádek z Merory)? Má čas nebo místo.
+export const reminderRings = (r) => Boolean(r?.date_time || r?.place_id);
+
 // Přesune připomínku stejným požadavkem jako úprava času v appce.
-export const moveReminder = (id, destination) =>
-  request('PATCH', `/reminders/${encodeURIComponent(id)}`, { date_time: destination.toISOString() });
+export const moveReminder = (id, destination, { from = null } = {}) =>
+  request('PATCH', `/reminders/${encodeURIComponent(id)}`, { date_time: destination.toISOString() }, { at: [from, destination] });
 
 // Založí připomínku stejným požadavkem jako formulář v appce (`POST /reminders`). Vrátí ji i s id.
 export async function createReminder({ task, when = null, note = null }) {
@@ -250,15 +281,15 @@ export async function createReminder({ task, when = null, note = null }) {
   if (!body.task) throw new Error(tr('reminderNeedsText'));
   if (when) body.date_time = when.toISOString();
   if (note?.trim()) body.note = note.trim();
-  return request('POST', '/reminders', body);
+  return request('POST', '/reminders', body, { rings: Boolean(when), at: [when] });
 }
 
 // Smaže připomínku stejným požadavkem jako appka (`DELETE /reminders/:id`). U opakované rozsah
 // 'occurrence' vynechá jen tenhle výskyt (Merora ho přeskočí) a 'series' smaže celé opakování, historie
 // zůstává. Jednorázová se smaže celá. V Meroře to vrátit nejde, rozhovor ji při „vrať to“ založí znovu.
 // Rozhovor maže až po výslovném „ano“ (Riccardo, 20. 11.).
-export const deleteReminder = (id, scope = null) =>
-  request('DELETE', `/reminders/${encodeURIComponent(id)}${scope ? `?scope=${encodeURIComponent(scope)}` : ''}`);
+export const deleteReminder = (id, scope = null, { rings = true, at = [] } = {}) =>
+  request('DELETE', `/reminders/${encodeURIComponent(id)}${scope ? `?scope=${encodeURIComponent(scope)}` : ''}`, undefined, { rings, at });
 
 // Znovu založí smazanou jednorázovou připomínku: text, čas, štítek, poznámka a hlasitost jako předtím.
 export function restoreReminder(r) {
@@ -267,18 +298,18 @@ export function restoreReminder(r) {
   if (r.label_id != null) body.label_id = r.label_id;
   if (r.note) body.note = r.note;
   if (typeof r.loud === 'boolean') body.loud = r.loud;
-  return request('POST', '/reminders', body);
+  return request('POST', '/reminders', body, { rings: reminderRings(r), at: [r.date_time] });
 }
 
 // Označí připomínku jako hotovou stejným požadavkem jako appka (`POST /mark-done`). U opakované jen tenhle
 // výskyt, další zůstává. Rozhovor odškrtává na výslovné přání (Riccardo 22. 11.: „odškrtnout už by měl umět
 // ne? Označit jako hotové.“). Seznam se tudy neodškrtává (trvalému by Merora vymazala odškrtnuté věci).
-export const markDone = (id) => request('POST', '/mark-done', { id });
+export const markDone = (id, { rings = true, at = [] } = {}) => request('POST', '/mark-done', { id }, { rings, at });
 
 // Vrátí hotovou zpátky mezi otevřené, jako „Vrátit“ v Hotových v appce (`POST /unmark-done`). Propojeným
 // aplikacím ji Merora pouští od 22. 11. (s Merora Pro, telefon dostane tichou zprávu). Kdyby vrátila 403,
 // rozhovor řekne, ať to člověk vrátí v appce.
-export const unmarkDone = (id) => request('POST', '/unmark-done', { id });
+export const unmarkDone = (id, { rings = true, at = [] } = {}) => request('POST', '/unmark-done', { id }, { rings, at });
 
 // Hotové připomínky (záložka Hotové v appce), nejnovější první, nejvýš 100. Propásnuté v nich nejsou.
 export const doneReminders = () => request('GET', '/reminders/done');
@@ -287,7 +318,7 @@ export const doneReminders = () => request('GET', '/reminders/done');
 // položku, ops ji odškrtnou nebo znovu otevřou. Meri jen přidává a při „vrať to“ bere zpět svoje přidání
 // (tools/lists.mjs). Vrací { reminder, closed }.
 export const changeList = (id, { ops = [], items = [] }) =>
-  request('POST', `/reminders/${encodeURIComponent(id)}/steps`, { ops, items });
+  request('POST', `/reminders/${encodeURIComponent(id)}/steps`, { ops, items }, { rings: false });
 
 // Totéž co otevření appky: vrátí otevřené připomínky a server při tom dorovná opakované. Telefonu to nevadí:
 // převzetí změny si Merora zapisuje jen u čtení appkou (dory-backend main/index.ts, check-for-reminders).

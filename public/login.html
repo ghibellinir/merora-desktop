@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Merora · propojení s účtem</title>
 <style>
-  :root { --karta: #10101a; --linka: #2a2a33; --text2: #aaaaaa; --modra: #5680f5; --oranz: #ff8a6a; }
+  :root { --karta: #10101a; --linka: #2a2a33; --text2: #aaaaaa; --modra: #5680f5; --oranz: #ff8a6a; --zelena: #6fd39a; }
   * { box-sizing: border-box; }
   body { margin: 0; background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif; line-height: 1.45; }
   main { max-width: 480px; margin: 0 auto; padding: 40px 16px 64px; }
@@ -23,21 +23,42 @@
   [hidden] { display: none; }
   #status { min-height: 24px; margin: 16px 0 0; color: #fff; font-weight: 500; }
   #status.error { color: var(--oranz); }
+  /* Po propojení: hlavní je, že je hotovo. Propojit znovu jen jako malý šedý odkaz dole (25. 11.: s velkým modrým
+     tlačítkem to vypadalo nedokončeně a tester propojoval dál). */
+  #done { display: flex; flex-direction: column; align-items: center; padding-top: 12vh; text-align: center; }
+  #done[hidden] { display: none; }
+  #done svg { display: block; margin-bottom: 20px; fill: none; stroke: var(--zelena); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  #done h1 { margin-bottom: 12px; font-size: 40px; color: var(--zelena); }
+  #done .lead { margin-bottom: 8px; font-size: 20px; color: #fff; }
+  #done .again { margin: 64px 0 0; font-size: 14px; }
+  #done .again a { color: var(--text2); white-space: nowrap; }
+  #done .again a:hover { color: #fff; }
+  #done .again a:focus-visible { outline: 2px solid var(--modra); outline-offset: 2px; border-radius: 4px; }
 </style>
 </head>
 <body>
 <!-- Texty doplní skript v jazyce z nastavení (public/i18n.js, klíče v data-i18n). Do té doby je stránka schovaná. -->
 <main hidden>
-  <h1 data-i18n="loginHeading"></h1>
-  <p data-i18n="loginIntro"></p>
+  <div id="done" hidden>
+    <svg width="88" height="88" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m7.5 12.5 3 3 6-6.5"/></svg>
+    <h1 data-i18n="loginDoneTitle"></h1>
+    <p class="lead" role="status" data-i18n="loginDone"></p>
+    <p class="note" id="count"></p>
+    <p class="again"><span data-i18n="loginAgain"></span> <a href="/oauth/start" data-i18n="connectAgain"></a></p>
+  </div>
 
-  <section>
-    <p data-i18n="loginHow"></p>
-    <a id="connect" class="button" href="/oauth/start" data-i18n="connectMerora"></a>
-    <p class="note" data-i18n="loginNote"></p>
-  </section>
+  <div id="form">
+    <h1 data-i18n="loginHeading"></h1>
+    <p data-i18n="loginIntro"></p>
 
-  <p id="status" role="status" aria-live="polite"></p>
+    <section>
+      <p data-i18n="loginHow"></p>
+      <a id="connect" class="button" href="/oauth/start" data-i18n="connectMerora"></a>
+      <p class="note" data-i18n="loginNote"></p>
+    </section>
+
+    <p id="status" role="status" aria-live="polite"></p>
+  </div>
 </main>
 <script type="module">
 import { setLanguage, t } from '/i18n.js';
@@ -47,7 +68,6 @@ const settings = await fetch('/api/settings').then((r) => r.json()).catch(() => 
 setLanguage(settings.language ?? 'cs');
 document.title = t('loginTitle');
 for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t(el.dataset.i18n);
-document.querySelector('main').hidden = false;
 
 const statusEl = document.getElementById('status');
 const setStatus = (text, error = false) => {
@@ -67,12 +87,19 @@ const connectedCount = query.get('connected');
 const returnError = ERRORS[query.get('error')];
 if (query.size) history.replaceState(null, '', location.pathname);
 
-const s = await (await fetch('/api/merora/status')).json();
-if (s.connected) document.getElementById('connect').textContent = t('connectAgain');
-
-if (connectedCount !== null) setStatus(t('loginConnected', { count: Number(connectedCount) || 0 }));
-else if (returnError) setStatus(returnError, true);
-else if (s.connected) setStatus(t('loginAlreadyConnected'));
+// Jestli je propojeno, říká jen server, ne adresa.
+const s = await fetch('/api/merora/status').then((r) => r.json()).catch(() => ({}));
+const done = Boolean(s.connected) && !s.ended && !returnError;
+document.getElementById('done').hidden = !done;
+document.getElementById('form').hidden = done;
+if (done) {
+  document.title = t('loginDoneTitle');
+  if (connectedCount !== null) document.getElementById('count').textContent = t('loginCount', { count: Number(connectedCount) || 0 });
+} else {
+  if (s.connected) document.getElementById('connect').textContent = t('connectAgain');
+  if (returnError) setStatus(returnError, true);
+}
+document.querySelector('main').hidden = false;
 </script>
 </body>
 </html>

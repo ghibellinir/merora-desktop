@@ -30,6 +30,7 @@ const ICONS = {
   people: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   gear: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
   cross: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  check: '<circle cx="12" cy="12" r="10"/><path d="m7.5 12.5 3 3 6-6.5"/>',
   // Části nastavení (Lucide).
   user: '<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>',
   text: '<path d="M15 12H3"/><path d="M17 18H3"/><path d="M21 6H3"/>',
@@ -49,6 +50,10 @@ export const icon = (name, size) =>
 
 // Je zdroj zapnutý? Shrnutí ho má v „zdroje“. Starší shrnutí a ukázky ho nemají, tam platí všechny.
 export const hasSource = (data, id) => !data.sources || data.sources.includes(id);
+// Maily můžou být z víc schránek (tools/mail.mjs).
+const MAIL_SOURCES = ['gmail', 'outlook'];
+export const hasMail = (data) => MAIL_SOURCES.some((id) => hasSource(data, id));
+export const mailsPending = (data) => Boolean(data.pending?.some((id) => MAIL_SOURCES.includes(id)));
 
 // POST s JSON tělem. Vrací { ok, status, data }; když server neodpoví, ok je false a status 0.
 export async function post(route, body = {}) {

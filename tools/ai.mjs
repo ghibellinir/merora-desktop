@@ -108,6 +108,12 @@ export class Conversation {
   }
 }
 
+// Konektory umí i psát (Gmail a Microsoft 365 posílat a mazat maily, Merora měnit připomínky). --allowedTools nástroje jen
+// předem povolí, ostatní nezakáže: kdo má v Claude Code vypnuté ptaní na povolení (bypassPermissions), tomu by prošlo
+// cokoli, třeba na pokyn v podvodném mailu (ověřeno 25. 11. 2026 s podvrženým konektorem). Režim default všechno ostatní
+// odmítne, ať má člověk v nastavení cokoli.
+const ONLY_ALLOWED = ['--permission-mode', 'default'];
+
 export function askClaude({ prompt, schema, model, services = [], system, limitMs = 240_000 }) {
   mkdirSync(WORK_DIR, { recursive: true });
   const args = [
@@ -119,7 +125,7 @@ export function askClaude({ prompt, schema, model, services = [], system, limitM
     '--no-session-persistence',
   ];
   if (system) args.push('--system-prompt', system);
-  if (services.length) args.push('--allowedTools', ...services);
+  if (services.length) args.push(...ONLY_ALLOWED, '--allowedTools', ...services);
   else args.push('--strict-mcp-config');
 
   return new Promise((finished, failed) => {
@@ -211,7 +217,7 @@ export function withTool({ prompt, services, schema = null, model = 'haiku', max
   const args = ['-p', '--model', model, '--tools', '', '--output-format', 'stream-json', '--verbose', '--no-session-persistence'];
   if (maxSteps) args.push('--max-turns', String(maxSteps));
   if (schema) args.push('--json-schema', JSON.stringify(schema));
-  args.push('--allowedTools', ...services);
+  args.push(...ONLY_ALLOWED, '--allowedTools', ...services);
   return new Promise((finished, failed) => {
     const p = spawn(claudePath(), args, { cwd: WORK_DIR, stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true });
     let pool = '';
@@ -240,7 +246,9 @@ export function withTool({ prompt, services, schema = null, model = 'haiku', max
           }
           const v = block.type === 'tool_result' ? call.get(block.tool_use_id) : null;
           if (v && v.content === null) {
-            v.content = typeof block.content === 'string' ? block.content : (block.content ?? []).map((c) => c.text ?? '').join('');
+            // parts: bloky zvlášť (některé služby dávají jeden výsledek na blok).
+            v.parts = typeof block.content === 'string' ? [block.content] : (block.content ?? []).map((c) => c.text ?? '').filter(Boolean);
+            v.content = v.parts.join('');
             v.error = Boolean(block.is_error);
           }
         }

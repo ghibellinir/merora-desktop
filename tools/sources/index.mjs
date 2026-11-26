@@ -11,7 +11,7 @@
 // Vypnutý nebo nepropojený zdroj (not-connected.mjs) se nesbírá, Meri o něm nemluví a jeho box na obrazovce není.
 // Zdroj, který selže, se jen přeskočí: Meri řekne, že se nenačetl, a v nastavení je u něj „Minule se nenačetl“.
 //
-// Jádro (Merora Desktop) má Meroru, kalendář, počasí a Gmail. Další zdroje jsou doplňky (Merora DEV):
+// Jádro (Merora Desktop) má Meroru, kalendář, počasí, Gmail a Outlook (maily obou jsou v okně dohromady, tools/mail.mjs). Další zdroje jsou doplňky (Merora DEV):
 // moduly ve složce dev/sources vedle jádra (nebo v MERORA_ADDONS), které navíc říkají, co z nich dostane
 // model a co se ukáže v okně (dev/README.md). Ve veřejné verzi ta složka není a jádro jede samo.
 import { createHash } from 'node:crypto';
@@ -25,8 +25,10 @@ import gmail from './gmail.mjs';
 import calendar from './calendar.mjs';
 import merora from './merora.mjs';
 import weather from './weather.mjs';
+import outlook from './outlook.mjs';
+import { MAIL_SOURCES, importantMail } from '../mail.mjs';
 
-const CORE = [merora, calendar, weather, gmail];
+const CORE = [merora, calendar, weather, gmail, outlook];
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 export const ADDONS_FOLDER = process.env.MERORA_ADDONS || join(ROOT, 'dev', 'sources');
 
@@ -77,7 +79,9 @@ const boxSource = (box) => box.source ?? (/^r\d+$/.test(box.id) ? 'merora' : /^k
 export function bySettings(data, settings = loadSettings()) {
   const disabled = new Set(SOURCES.filter((z) => !isEnabled(z, settings)).map((z) => z.id));
   if (!disabled.size) return data;
-  const boxEnabled = (box) => !disabled.has(boxSource(box));
+  const mailsOff = MAIL_SOURCES.every((id) => disabled.has(id));
+  const boxEnabled = (box) => (box.id === 'mails' ? !mailsOff : !disabled.has(boxSource(box)));
+  data = withoutMailbox(data, disabled);
   return {
     ...data,
     sources: (data.sources ?? SOURCES.map((z) => z.id)).filter((id) => !disabled.has(id)),
@@ -86,8 +90,38 @@ export function bySettings(data, settings = loadSettings()) {
     tiles: data.tiles.filter(boxEnabled),
     panels: (data.panels ?? []).filter(boxEnabled),
     errors: disabled.has(BOX_SOURCE.chyby) ? [] : data.errors, // jen starší shrnutí a natáčení
-    mails: disabled.has('gmail') ? [] : data.mails,
-    inbox: disabled.has('gmail') ? undefined : data.inbox,
+    mails: mailsOff ? [] : data.mails,
+    inbox: mailsOff ? undefined : data.inbox,
+  };
+}
+
+// Vypnutá jedna schránka ze dvou: její maily zmizí z panelu, z rozhovoru i z čísla na dlaždici hned.
+// Shrnutí z doby před Outlookem mailCounts nemá a všechny maily v něm jsou z Gmailu.
+function withoutMailbox(data, disabled) {
+  const from = (m) => m.src ?? 'gmail';
+  const off = MAIL_SOURCES.filter((id) => disabled.has(id) && data.mailCounts?.[id] !== undefined);
+  if (!off.length || !data.inbox || off.length === Object.keys(data.mailCounts).length) return data;
+  const inbox = { ...data.inbox, mails: data.inbox.mails.filter((m) => !off.includes(from(m))) };
+  inbox.count = Object.entries(data.mailCounts).reduce((sum, [id, n]) => sum + (off.includes(id) ? 0 : n), 0);
+  const due = inbox.mails.filter((m) => m.deadline === data.forDay).length;
+  const urgent = inbox.mails.filter((m) => m.urgent).length;
+  const important = inbox.mails.filter(importantMail).length;
+  const { captionTone, ...plain } = data.tiles.find((d) => d.id === 'mails') ?? {};
+  const tile =
+    data.day === 'tomorrow'
+      ? { ...plain, value: String(due), caption: tr(due ? 'dueTomorrow' : 'noDeadline') }
+      : {
+          ...plain,
+          value: inbox.more ? `${inbox.count}+` : String(inbox.count),
+          caption: !inbox.count ? tr('nothingNew') : urgent ? tr('urgentCount', { count: urgent }) : important ? tr('importantCount', { count: important }) : tr('nothingImportant'),
+          ...(urgent ? { captionTone: 'fired' } : {}),
+        };
+  return {
+    ...data,
+    inbox,
+    mails: data.mails.filter((m) => !off.includes(from(m))),
+    importantMails: data.day === 'tomorrow' ? due : important,
+    tiles: data.tiles.map((d) => (d.id === 'mails' && !d.loading ? tile : d)),
   };
 }
 

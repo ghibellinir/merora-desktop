@@ -90,7 +90,7 @@ export async function welcome({ again = false } = {}) {
       title: () => t('welcomeNameTitle'),
       body: () => `
         <label class="field"><span>${t('salutationField')}</span>
-          <input id="welcome-salutation" maxlength="40" autocomplete="off" placeholder="${t('salutationPlaceholder')}" value="${esc(snapshot.profile.salutation)}"></label>
+          <input id="welcome-salutation" maxlength="40" autocomplete="off" value="${esc(snapshot.profile.salutation)}"></label>
         <p class="caption">${t('salutationNote')}</p>
         <fieldset class="field"><legend>${t('genderLabel')}</legend>
           <label class="option-row"><input type="radio" name="welcome-gender" value="male" ${snapshot.profile.gender !== 'female' ? 'checked' : ''}> ${t('genderMale')}</label>
@@ -108,15 +108,23 @@ export async function welcome({ again = false } = {}) {
       title: () => t('welcomeCityTitle'),
       body: () => `
         <label class="field"><span>${t('cityLabel')}</span>
-          <input id="welcome-city" maxlength="80" autocomplete="off" placeholder="${t('cityPlaceholder')}" value="${esc(snapshot.profile.city ?? '')}"></label>
+          <input id="welcome-city" maxlength="80" autocomplete="off" value="${esc(snapshot.profile.city ?? '')}"></label>
         <p class="caption" id="welcome-city-note">${t('cityNote')}</p>`,
+      // Prázdné pole je prázdné (25. 11.: šedý příklad „Praha“ vypadal vyplněně) a tlačítko řekne, co se tím stane.
+      button: () => ($('welcome-city').value.trim() ? t('next') : t('nextWithoutCity')),
+      onAny: () => {
+        $('welcome-city').addEventListener('input', () => {
+          $('welcome-next').textContent = steps[i].button();
+        });
+      },
       // Nalezené město se ukáže k potvrzení: druhé „Další“ pokračuje, jiný název se hledá znovu.
       next: async () => {
         const city = $('welcome-city').value.trim();
-        if (!city || city === snapshot.profile.city) return true;
+        if (city === (snapshot.profile.city ?? '')) return true;
         const { ok, data } = await post('/api/settings', { profile: { city } });
         if (!ok) return error(data.error ?? t('saveFailed')), false;
         snapshot = data;
+        if (!city) return true; // smazané město: bez počasí
         $('welcome-city').value = snapshot.profile.city;
         $('welcome-city-note').textContent = t('cityFound', { city: snapshot.profile.city });
         return false;
@@ -142,29 +150,31 @@ export async function welcome({ again = false } = {}) {
     {
       title: () => t('welcomeMeroraTitle'),
       body: () => {
-        const connected = snapshot.sources.find((z) => z.id === 'merora')?.connected;
+        // Propojená: hlavní je, že je hotovo, propojit znovu jde jen malým odkazem (25. 11.: tester s velkým
+        // tlačítkem propojoval dál, protože to vypadalo nedokončeně).
+        const merora = snapshot.sources.find((z) => z.id === 'merora');
+        if (merora?.connected && !merora.problem) {
+          return `
+        <p class="connected" role="status">${icon('check', 24)}<span>${t('meroraConnected')}</span></p>
+        <p>${t('meroraConnectedNext')}</p>
+        <a class="quiet-link" href="/oauth/start" target="_blank">${t('connectAgain')}</a>`;
+        }
         return `
         <p>${t('welcomeMerora')}</p>
         <ol class="steps">
           <li>${t('welcomeMeroraStep1')}</li>
           <li>${t('welcomeMeroraStep2')}</li>
         </ol>
-        <a class="button${connected ? ' secondary' : ''}" id="welcome-merora" href="/oauth/start" target="_blank">${connected ? t('connectAgain') : t('connectMerora')}</a>
-        <p class="caption${connected ? ' done' : ''}" id="welcome-merora-note" role="status">${connected ? t('meroraConnected') : ''}</p>
+        <a class="button" id="welcome-merora" href="/oauth/start" target="_blank">${t('connectMerora')}</a>
+        <p class="caption" id="welcome-merora-note" role="status"></p>
         <p class="caption">${t('welcomeMeroraNote')}</p>`;
       },
       onAny: () => {
-        $('welcome-merora').addEventListener('click', () => {
-          const caption = $('welcome-merora-note');
-          caption.className = 'caption';
-          caption.textContent = CONNECT_NOTE();
+        $('welcome-merora')?.addEventListener('click', () => {
+          $('welcome-merora-note').textContent = CONNECT_NOTE();
           waitForConnection('merora', (fresh) => {
             snapshot = fresh;
-            if (!$('welcome-merora-note')) return; // úvod je už jinde
-            $('welcome-merora-note').className = 'caption done';
-            $('welcome-merora-note').textContent = t('meroraConnectedNext');
-            $('welcome-merora').textContent = t('connectAgain');
-            $('welcome-merora').classList.add('secondary');
+            if ($('welcome-merora-note')) render(); // jinak je úvod už jinde
           });
         });
       },

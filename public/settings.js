@@ -13,6 +13,8 @@ export const sourcesHtml = (sources, prefix) =>
       const problem = z.enabled ? z.problem : null;
       const note = problem ?? (z.failed ? t('sourceFailed') : z.connected ? t(z.link ? 'sourceLinked' : 'sourceConnected') : z.connector ? t('sourceConnector') : '');
       const id = `${prefix}-zdroj-${esc(z.id)}`;
+      // Propojený a funguje: zeleně, a propojit znovu jen malým odkazem. Tlačítko je jen tam, kde je co udělat.
+      const fine = z.connected && !problem && !z.failed;
       // Odkaz: chybějící nebo takový, který se minule nenačetl, má pole rovnou. Uložený jde změnit a odpojit (25. 11.:
       // tester uložil špatný odkaz, pole zmizelo a kalendář už propojit nešel).
       const askLink = !z.connected || z.failed;
@@ -21,7 +23,7 @@ export const sourcesHtml = (sources, prefix) =>
           ? `<div class="link-form"${askLink ? '' : ' hidden'}><div class="link">
               <input type="url" autocomplete="off" placeholder="https://…" aria-label="${esc(t('sourceLink', { title: z.title }))}">
               <button type="button" class="button save-link" data-source="${esc(z.id)}">${t('save')}</button>
-            </div><div class="caption warning link-error" role="alert"></div>${z.hint ? `<div class="caption">${esc(z.hint)}</div>` : ''}</div>${
+            </div><div class="caption warning link-error" role="alert"></div>${guides(z, id)}</div>${
               z.connected
                 ? `<div class="link-actions">
               ${askLink ? '' : `<button type="button" class="button secondary edit-link">${t('changeLink')}</button>`}
@@ -35,14 +37,14 @@ export const sourcesHtml = (sources, prefix) =>
         : '';
       // Otevře se v prohlížeči (stránka Merory s QR kódem), okno pak samo pozná, že je propojeno.
       const connect = z.connect
-        ? `<a class="button${z.connected ? ' secondary' : ''} connect" href="${esc(z.connect.address)}" target="_blank" data-source="${esc(z.id)}">${esc(z.connected ? t('connectAgain') : z.connect.text)}</a>`
+        ? `<a class="${fine ? 'quiet-link' : `button${z.connected && !problem ? ' secondary' : ''}`} connect" href="${esc(z.connect.address)}" target="_blank" data-source="${esc(z.id)}">${esc(z.connected ? t('connectAgain') : z.connect.text)}</a>`
         : '';
       return `
       <div class="option source">
         <div class="tile blue">${icon(z.icon, 20)}</div>
         <div class="description">
           <div class="title" id="${id}">${esc(z.title)}</div>
-          <div class="caption">${esc(z.description)}${note ? `<br><span class="${problem || z.failed ? 'warning' : ''}">${esc(note)}</span>` : ''}</div>
+          <div class="caption">${esc(z.description)}${note ? `<br><span class="${problem || z.failed ? 'warning' : fine ? 'done' : ''}">${esc(note)}</span>` : ''}</div>
           ${link}${checkable}${connect}
         </div>
         <button type="button" class="switch" role="switch" data-source="${esc(z.id)}" aria-checked="${z.enabled}" aria-labelledby="${id}"><span class="knob"></span></button>
@@ -50,12 +52,22 @@ export const sourcesHtml = (sources, prefix) =>
     })
     .join('');
 
+// Kde se odkaz vezme: pro každou službu zvlášť, rozbalí se jen ta, kterou člověk má (25. 11.: v jednom odstavci začínal
+// „Google:“ a kalendář vypadal, že umí jen Google). Doplněk může mít jen jednu větu (hint).
+const guides = (z, id) => {
+  if (!z.guides?.length) return z.hint ? `<div class="caption">${esc(z.hint)}</div>` : '';
+  return `<div class="guides"><div class="caption">${t('linkWhere')}</div>${z.guides
+    .map((g) => `<details name="${id}-guide"><summary>${esc(g.name)}</summary><div class="caption">${esc(g.text)}</div></details>`)
+    .join('')}${z.help ? `<a class="quiet-link" href="${esc(z.help)}" target="_blank" rel="noopener">${t('linkHelp')}</a>` : ''}</div>`;
+};
+
 // Kliknutí v řádcích zdrojů (nastavení i úvod): přepínač, uložení odkazu, kontrola nebo propojení účtu.
 // Vrací { ok, data, changed, connecting, keep } (changed = okno se po zavření načte znovu, connecting = id zdroje,
 // na jehož propojení se čeká, keep = řádky nepřekreslovat, ať nezmizí vložený odkaz), nebo null, když není co dělat.
 export async function clickOnSource(e) {
   const connect = e.target.closest('.connect[data-source]');
-  if (connect) return { ok: true, data: {}, changed: false, connecting: connect.dataset.source };
+  // Propojený účet znovu (malý odkaz): jen se otevře stránka, není na co čekat.
+  if (connect) return connect.classList.contains('quiet-link') ? null : { ok: true, data: {}, changed: false, connecting: connect.dataset.source };
   const toggle = e.target.closest('.switch[data-source]');
   if (toggle) {
     const { ok, data } = await post('/api/settings', {
@@ -129,7 +141,9 @@ export function waitForConnection(id, finished) {
   pollTimer = setInterval(async () => {
     if (Date.now() > end) return clearInterval(pollTimer);
     const snapshot = await (await fetch('/api/settings')).json().catch(() => null);
-    if (!snapshot?.sources?.find((z) => z.id === id)?.connected) return;
+    // Propojení, které skončilo (problem), se počítá až po novém souhlasu.
+    const source = snapshot?.sources?.find((z) => z.id === id);
+    if (!source?.connected || source.problem) return;
     clearInterval(pollTimer);
     finished(snapshot);
   }, 2000);
@@ -206,10 +220,12 @@ export function settingsWindow() {
             </div>
             <h3>${t('aboutYou')}</h3>
             ${languageField('profile-language')}
-            <label class="field"><span>${t('salutationLabel')}</span><input id="profile-salutation" maxlength="40" autocomplete="off" placeholder="${t('salutationPlaceholder')}"></label>
+            <label class="field"><span>${t('salutationLabel')}</span><input id="profile-salutation" maxlength="40" autocomplete="off"></label>
+            <div class="caption">${t('salutationNote')}</div>
             <label class="field"><span>${t('genderLabel')}</span>
               <select id="profile-gender"><option value="male">${t('genderMale')}</option><option value="female">${t('genderFemale')}</option></select></label>
-            <label class="field"><span>${t('cityLabel')}</span><input id="profile-city" maxlength="80" autocomplete="off" placeholder="${t('cityPlaceholder')}"></label>
+            <label class="field"><span>${t('cityLabel')}</span><input id="profile-city" maxlength="80" autocomplete="off"></label>
+            <div class="caption">${t('cityExample')}</div>
             <div class="row"><button type="button" class="button" id="profile-save">${t('save')}</button><span class="caption" id="profile-note" role="status"></span></div>
           </section>
           <section data-section="brief" hidden>
@@ -334,12 +350,16 @@ export function settingsWindow() {
       return;
     }
     $('account-title').textContent = u.connected ? u.email ?? t('connected') : t('notConnected');
+    const merora = snapshot.sources.find((z) => z.id === 'merora');
+    const ended = u.connected && merora?.problem;
     if (!waitingForAccount) {
-      $('account-note').textContent = u.connected ? t('accountConnectedNote') : t('accountNotConnectedNote');
+      $('account-note').textContent = ended || (u.connected ? t('accountConnectedNote') : t('accountNotConnectedNote'));
+      $('account-note').classList.toggle('warning', Boolean(ended));
     }
     const connect = $('account-connect');
+    const fine = u.connected && !ended && !merora?.failed;
     connect.textContent = u.connected ? t('connectAgain') : t('connectMerora');
-    connect.classList.toggle('secondary', u.connected);
+    connect.className = `${fine ? 'quiet-link' : `button${u.connected && !ended ? ' secondary' : ''}`} connect`;
     $('account-disconnect').hidden = !u.connected;
   }
 
@@ -531,8 +551,9 @@ export function settingsWindow() {
     // Zpětná vazba v menu je odkaz na nástěnku v UserJotu (Riccardo 23. 11.), ne část nastavení.
     const section = e.target.closest('.menu-item:not(.menu-link), .section-link');
     if (section) return showSection(section.dataset.section ?? section.dataset.go);
-    if (e.target.closest('#account-connect') && snapshot?.account) {
+    if (e.target.closest('#account-connect:not(.quiet-link)') && snapshot?.account) {
       waitingForAccount = true;
+      $('account-note').classList.remove('warning');
       $('account-note').textContent = CONNECT_NOTE();
       waitForConnection('merora', (fresh) => {
         snapshot = fresh;

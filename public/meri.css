@@ -187,7 +187,7 @@ body.no-cursor { cursor: none; }
 }
 .phone-status.visible { opacity: 1; }
 .phone-status svg { flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.phone-status.ok { color: var(--ico); }
+.phone-status.ok { color: #6fd39a; }
 .phone-status.warn { color: var(--fired); }
 .phone-status + .mic { margin-top: 12px; }
 .mic {
@@ -354,6 +354,18 @@ body.no-cursor .corner .tooltip:not(.shown) { opacity: 0; }
 .settings .check { margin-top: 8px; padding: 6px 12px; font-size: 14px; }
 a.button { display: inline-block; text-decoration: none; }
 .settings .connect { margin-top: 8px; padding: 6px 12px; font-size: 14px; }
+/* Vedlejší odkaz (propojit znovu, podrobný návod): šedý text, ne tlačítko. */
+.settings .quiet-link { display: inline-block; margin-top: 8px; padding: 0; color: var(--ink-2); font-size: 14px; line-height: 20px; text-decoration: underline; text-underline-offset: 3px; }
+.settings .quiet-link:hover { color: #fff; }
+.settings .quiet-link:focus-visible { outline: 2px solid var(--bubble-line); outline-offset: 2px; border-radius: 4px; }
+.settings #account-buttons .quiet-link { order: 1; margin-top: 0; padding: 0; font-size: 14px; }
+/* Kde se vezme odkaz (kalendář): jeden rozbalovací řádek na službu. */
+.settings .guides { margin-top: 8px; }
+.settings .guides details { border-bottom: 1px solid var(--line); }
+.settings .guides summary { padding: 6px 2px; font-size: 14px; line-height: 20px; color: var(--ink-card); cursor: pointer; }
+.settings .guides summary:hover { color: #fff; }
+.settings .guides summary:focus-visible { outline: 2px solid var(--bubble-line); outline-offset: 1px; border-radius: 6px; }
+.settings .guides details .caption { margin: 0 0 8px 18px; }
 .settings .other-voice { display: inline-block; margin: 0 0 8px; color: var(--ico); text-decoration: none; }
 .settings .other-voice:hover { text-decoration: underline; }
 
@@ -371,6 +383,8 @@ a.button { display: inline-block; text-decoration: none; }
 .welcome .keys li { margin: 6px 0; }
 .welcome kbd { padding: 1px 8px; border-radius: 6px; border: 1px solid var(--edge); font: inherit; font-size: 14px; }
 .welcome .install { margin-top: 8px; }
+.welcome .connected { display: flex; align-items: center; gap: 10px; margin: 16px 0 8px; font-size: 22px; line-height: 28px; font-weight: 600; color: #6fd39a; }
+.welcome .connected svg { flex: none; }
 .welcome .steps { margin: 8px 0 14px; padding-left: 22px; }
 .welcome .steps li { margin: 6px 0; }
 .welcome .address { display: flex; align-items: center; gap: 8px; margin-top: 6px; }

@@ -16,8 +16,8 @@ import { TAIL, buildTimeline } from './public/timeline.js';
 import { loadEnv, addVoice, voiceCatalog, writeEnv } from './tools/elevenlabs.mjs';
 import { currentVoice, isVoiced, loadDurations, loadVoiceList, cleanUp, saveVoiceList, makeVoice, voiceKey } from './tools/voice.mjs';
 import {
-  consentUrl, finishConsent, hasOAuth, oauthAvailable, disconnectOAuth, fetchReminders, remindersWithoutWrites, directAvailable, oauthAccount,
-  phoneStatus, writesSoFar,
+  consentUrl, finishConsent, hasOAuth, connectionEnded, oauthAvailable, disconnectOAuth, fetchReminders, remindersWithoutWrites, directAvailable, oauthAccount,
+  phoneStatus, writesSoFar, ringingWritesSoFar, takeSoonestRing,
   OAUTH_CLIENT_ID, realtimeAuth, realtimeConfig,
 } from './tools/merora.mjs';
 import { meroraSignal } from './tools/realtime.mjs';
@@ -30,6 +30,7 @@ import { SOURCES, isEnabled, fingerprintForSentences, bySettings, toggleSource, 
 import { MERORA_MCP, prepareReminders } from './tools/sources/merora.mjs';
 import { fillPending, rewriteSource, sentencesStale, withoutSource } from './tools/live.mjs';
 import { pendingDay, waitingMails } from './tools/pending.mjs';
+import { inboxOf, isMail, MAIL_SOURCES } from './tools/mail.mjs';
 import { checkForUpdate, updateInfo, applyUpdate, currentVersion } from './tools/update.mjs';
 import { tr } from './tools/i18n.mjs';
 
@@ -117,9 +118,10 @@ function loadTomorrow({ sentences = true } = {}) {
         const sourceData = await collectTomorrow(start);
         const brief = composeBrief({ today: [], mails: [], sentences: [] }, sourceData, start, { tomorrow: true });
         // Maily zítřka jsou z dnešního načtení. Když ještě běží, dlaždice čeká na ně (afterPrepare).
-        const mails = 'gmail' in sourceData || !currentData().pending?.includes('gmail')
-          ? {}
-          : { sources: [...brief.sources, 'gmail'], tiles: [...brief.tiles, waitingMails({ tomorrow: true })], pending: ['gmail'] };
+        const waits = MAIL_SOURCES.filter((id) => !(id in sourceData) && currentData().pending?.includes(id));
+        const mails = waits.length
+          ? { sources: [...brief.sources, ...waits], tiles: [...brief.tiles.filter((d) => d.id !== 'mails'), waitingMails({ tomorrow: true })], pending: waits }
+          : {};
         writeTomorrowBrief({ ...brief, ...mails, createdAt: new Date().toISOString(), sourceData, sentencesFingerprint: null, provisional: true });
         if (state.day === 'tomorrow') {
           state = { ...state, rev: state.rev + 1 };
@@ -154,7 +156,7 @@ function writeLiveTomorrow(id, data) {
     const shown = bySettings(brief);
     state = { ...state, lines: shown.today, tiles: shown.tiles, pending: shown.pending ?? null, failed: shown.failed ?? null, linesDay: 'tomorrow', ...(id === 'weather' && brief.weather ? { weather: brief.weather } : {}) };
     // Panel s maily okno na místě nepřepisuje: vezme si nová data (bez načtení stránky, public/app.js takeNewData).
-    if (id === 'gmail' && !isBusy()) state = { ...state, rev: state.rev + 1 };
+    if (isMail(id) && !isBusy()) state = { ...state, rev: state.rev + 1 };
     broadcast();
   }
   console.log(`Živá data zítřka: ${id} se změnil`);
@@ -430,7 +432,7 @@ function afterPrepare(error) {
   // Nové maily dneška přepočítají i maily zítřka (dlaždice a panel Maily na zítřek), ať Zítra sedí s Dnes.
   if (!sentences && collectionDay === 'today') {
     if (error) pendingFailed();
-    writeLiveTomorrow('gmail', error ? null : currentData()?.sourceData?.gmail);
+    for (const id of MAIL_SOURCES) writeLiveTomorrow(id, error ? null : currentData()?.sourceData?.[id]);
   }
   if (quiet) {
     if (error) {
@@ -537,14 +539,30 @@ function showNewData(attempt = 0) {
 // daty (první načtení spouští člověk, třeba až po úvodu) a ne, když Meri mluví nebo se s ní mluví.
 // Zdroje bez AI jdou zvlášť: Merora každou minutu jako záloha signálu z Merory (s připojeným signálem po pěti
 // minutách), kalendář a počasí zhruba každou čtvrthodinu. Ty nic nepřerušují, okno je přepíše na místě.
-// Převzal telefon změnu z počítače? Po každém zápisu do Merory (rozhovor) se server několikrát zeptá
-// (`GET /devices/status`) a okno ukáže „V telefonu ✓“, nebo radu otevřít Meroru v mobilu (Riccardo 21. 11.).
-// Telefon obvykle potvrdí do 3 s, „nepřevzal“ Merora hlásí asi po 48 s; telefonu pak sama pošle „Otevři mě“.
-// phone ve stavu: null, nebo { status: waiting | confirmed | not_confirmed, at }.
+// Převzal telefon změnu z počítače? Po každém zápisu do Merory (rozhovor) se server ptá `GET /devices/status`
+// (Riccardo 21. 11., pravidla 26. 11.: „nejlepší scénář … jen zelený nápis že to je v mobilu … Mobil nic
+// neoznamuje a Meri nic neoznamuje“). Převzal = „V mobilu ✓“ zeleně a nic víc. Merora čeká 48 s, pak hlásí
+// `not_confirmed` a sama pošle do mobilu hlasité „Otevři mě“, když se změna týká připomínky, která zvoní (čas
+// nebo místo). Tehdy to Meri řekne nahlas (announcePhoneMissed) a okno ukáže varování, dokud mobil změnu
+// nepřevezme. Ostatní (seznam, Kdykoli) jen šedě „V mobilu se to ukáže, až ho otevřeš“. Převzetí po otevření
+// appky Merora nijak neohlásí, proto se server ptá dál: po minutě každých 10 s, po 10 minutách každou minutu,
+// nejdéle 2 hodiny. Když změna zvoní do 3 minut, Meri na Meroru nečeká: nepřevzatou po 20 s ohlásí sama (48 s by
+// bylo pozdě). Radit otevřít appku hned v odpovědi, bez stavu, mátlo, když to mobil převzal (Riccardo 26. 11.).
+// phone ve stavu: null, nebo { status: waiting | confirmed | not_confirmed | later, at }.
 const PHONE_ASK_S = [1.5, 3, 5, 8, 12, 20, 30, 40, 50, 60];
+const phoneAgainMs = (sinceMs) => (sinceMs < 10 * 60_000 ? 10_000 : 60_000);
+const PHONE_GIVE_UP_MS = 2 * 3600_000;
+const PHONE_SOON_MS = 3 * 60_000;
+const PHONE_SOON_WAIT_MS = 20_000;
 let writesSeen = writesSoFar();
+let ringsSeen = ringingWritesSoFar();
+// Zvoní některá změna, kterou telefon ještě nepřevzal? Merora je sčítá stejně (`sync_rings`), dokud je nepřevezme.
+let phoneRings = false;
+// Nejbližší zvonění mezi nepřevzatými změnami (takeSoonestRing v tools/merora.mjs).
+let phoneSoonAt = null;
 let phoneTimer = null;
 function setPhone(status) {
+  dialog.phoneIs(status);
   state = { ...state, phone: status ? { status, at: Date.now() } : null };
   broadcast();
 }
@@ -552,11 +570,17 @@ function watchPhone() {
   const n = writesSoFar();
   if (n === writesSeen) return;
   writesSeen = n;
+  if (ringingWritesSoFar() !== ringsSeen) phoneRings = true;
+  ringsSeen = ringingWritesSoFar();
+  const ringAt = takeSoonestRing();
+  if (ringAt && (!phoneSoonAt || ringAt < phoneSoonAt)) phoneSoonAt = ringAt;
   // Po zápisu z rozhovoru se Merora hned přečte znovu: změna se tak propíše i do zítřka (dnešek už má).
   setTimeout(() => readMeroraNow('write', { immediate: true }), 1500);
   if (VIDEO || !directAvailable()) return;
   clearTimeout(phoneTimer);
+  dialog.cancelPhoneNotice();
   const started = Date.now();
+  let missed = false;
   setPhone('waiting');
   const ask = async (i) => {
     let phone = null;
@@ -566,12 +590,43 @@ function watchPhone() {
       console.error(`Telefon: ${err.message}`);
     }
     if (writesSoFar() !== writesSeen) return; // mezitím další zápis, ptá se už nové sledování
-    if (phone === 'confirmed' || phone === 'not_confirmed') return setPhone(phone);
+    const since = Date.now() - started;
+    if (phone === 'confirmed') {
+      phoneRings = false;
+      phoneSoonAt = null;
+      dialog.cancelPhoneNotice();
+      return setPhone('confirmed');
+    }
     // Bez telefonu (no_device), nebo když se nic nezměnilo ani po 12 s (idle), nic neukazovat.
-    if (phone === 'no_device' || (phone === 'idle' && Date.now() - started > 12_000) || i + 1 >= PHONE_ASK_S.length) return setPhone(null);
-    phoneTimer = setTimeout(() => ask(i + 1), (PHONE_ASK_S[i + 1] - PHONE_ASK_S[i]) * 1000);
+    if (phone === 'no_device' || (phone === 'idle' && since > 12_000)) return setPhone(null);
+    const soon = phoneRings && phoneSoonAt > Date.now() && phoneSoonAt - Date.now() < PHONE_SOON_MS;
+    if (phone === 'not_confirmed' || (soon && phone === 'waiting' && since >= PHONE_SOON_WAIT_MS)) {
+      const status = phoneRings ? 'not_confirmed' : 'later';
+      if (state.phone?.status !== status) setPhone(status);
+      if (phoneRings && !missed) announcePhoneMissed();
+      missed = true;
+    } else if (!missed && i + 1 >= PHONE_ASK_S.length) return setPhone(null); // za minutu nic jistého: nevíme
+    // Výpadek po varování varování nechá, ptá se dál.
+    if (since > PHONE_GIVE_UP_MS) return setPhone(null);
+    const delay = i + 1 < PHONE_ASK_S.length ? (PHONE_ASK_S[i + 1] - PHONE_ASK_S[i]) * 1000 : phoneAgainMs(since);
+    phoneTimer = setTimeout(() => ask(i + 1), delay);
   };
   phoneTimer = setTimeout(() => ask(0), PHONE_ASK_S[0] * 1000);
+}
+
+// Meri řekne nahlas, že mobil změnu nemá (tools/dialog.mjs sayPhoneNotice). Jen s otevřeným oknem (bez něj stačí
+// „Otevři mě“ v mobilu) a až nic neříká ani nechystá: shrnutí, odpověď a rozpracovaná věta mají přednost.
+// Zkouší se každé 2 s, nejdéle 3 minuty. Převzetí mezitím větu zruší (watchPhone).
+function announcePhoneMissed() {
+  const started = Date.now();
+  dialog.phoneMissed();
+  const attempt = () => {
+    if (!dialog.phoneNoticePending) return;
+    if (Date.now() - started > 180_000) return dialog.cancelPhoneNotice();
+    if (clients.size && !isBusy() && dialog.sayPhoneNotice()) return;
+    setTimeout(attempt, 2000);
+  };
+  attempt();
 }
 setInterval(watchPhone, 1000);
 
@@ -765,17 +820,21 @@ function runCollection(extraArgs = []) {
     stdio: ['ignore', 'ignore', 'pipe', 'ipc'], // na výstupu jsou tvoje připomínky, do logu jdou jen chyby
     windowsHide: true,
   });
-  // Maily jsou hotové dřív než celé shrnutí: dlaždice se přepíše hned a kolečko u ní zmizí.
+  // Maily jsou hotové dřív než celé shrnutí: dlaždice se přepíše hned a kolečko u ní zmizí. S víc schránkami, až když
+  // přišly všechny, ať číslo neposkočí (ta, která selhala, nepřijde vůbec a počká se na celé shrnutí).
+  const arrived = {};
   collection.on('message', (msg) => {
-    if (msg?.source !== 'gmail' || collectionDay !== 'today' || msg.data == null) return;
+    if (!isMail(msg?.source) || collectionDay !== 'today' || msg.data == null) return;
+    arrived[msg.source] = msg.data;
+    const complete = MAIL_SOURCES.every((id) => id in arrived || !bySettings(currentData()).sources?.includes(id));
     // Dnešek, který se teprve načítá: maily se ukážou hned i s panelem, věty a doplňky doběhnou po nich.
-    const filled = currentData().pending?.includes('gmail') ? updateBrief((b) => rewriteSource(b, 'gmail', msg.data)) : null;
+    const filled = currentData().pending?.includes(msg.source) ? updateBrief((b) => rewriteSource(b, msg.source, msg.data)) : null;
     const swap = filled && state.day === 'today' && !isBusy() && !dialog.v;
-    const tile = mailBoxes(msg.data, [], new Date()).tile;
-    const tiles = state.day === 'today' ? (state.linesDay === 'today' && state.tiles ? state.tiles : bySettings(currentData()).tiles) : null;
+    const tile = complete ? mailBoxes(inboxOf(arrived), [], new Date()).tile : null;
+    const tiles = tile && state.day === 'today' ? (state.linesDay === 'today' && state.tiles ? state.tiles : bySettings(currentData()).tiles) : null;
     state = {
       ...state,
-      loadedTiles: [...new Set([...(state.loadedTiles ?? []), 'mails'])],
+      loadedTiles: [...new Set([...(state.loadedTiles ?? []), ...(complete ? ['mails'] : [])])],
       ...(tiles ? { tiles: tiles.map((d) => (d.id === 'mails' ? tile : d)), linesDay: 'today' } : {}),
       ...(swap ? { rev: state.rev + 1 } : {}),
     };
@@ -874,7 +933,8 @@ function settingsState() {
   return {
     voice: state.voice,
     hasKey: hasVoiceKey(),
-    // Zdroj může mít anglické texty v en (title, description, hint, connectText), jinak zůstanou jeho.
+    // Zdroj může mít anglické texty v en (title, description, hint, guides, connectText), jinak zůstanou jeho. Podrobný
+    // návod (help) je jen v jazyce, ve kterém je napsaný.
     sources: SOURCES.map((z) => ({
       id: z.id,
       title: (language(n) === 'en' && z.en?.title) || z.title,
@@ -883,6 +943,8 @@ function settingsState() {
       connector: z.connection.kind === 'connector',
       link: z.connection.kind === 'link', // odkaz (kalendář) se vkládá přímo v okně
       hint: (language(n) === 'en' && z.en?.hint) || z.hint || null,
+      guides: (language(n) === 'en' && z.en?.guides) || z.guides || null,
+      help: (language(n) === 'en' ? z.en?.help : z.help) ?? null,
       checkable: typeof z.check === 'function' && !z.connect, // jde ověřit, že je propojený
       // Propojení s účtem jedním tlačítkem (Merora: stránka s QR kódem, souhlas v telefonu).
       connect: z.connect ? { ...z.connect, ...(language(n) === 'en' && z.en?.connectText ? { text: z.en.connectText } : {}) } : null,
@@ -1399,7 +1461,7 @@ async function api(req, res, pathname) {
   }
   // Je propojená s účtem Merora? Úvod a nastavení se ptají, dokud se na stránce Merory nepotvrdí souhlas.
   if (pathname === '/api/merora/status') {
-    json(res, 200, { connected: hasOAuth(), oauthConnection: oauthAvailable() });
+    json(res, 200, { connected: hasOAuth(), ended: connectionEnded(), oauthConnection: oauthAvailable() });
     return true;
   }
   return false;

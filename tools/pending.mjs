@@ -6,6 +6,7 @@
 import { dateForScreen, dayOf, greeting } from './time.mjs';
 import { tr } from './i18n.mjs';
 import { profile } from './settings.mjs';
+import { isMail, MAIL_SOURCES } from './mail.mjs';
 
 // Dlaždice, než přijdou data: ikona a název zůstanou, místo čísla je kolečko.
 const waiting = ({ id, icon, tone, title, source }) => ({ id, icon, tone, title, value: '', caption: '', ...(source ? { source } : {}), loading: true });
@@ -17,18 +18,19 @@ const coreTiles = (sources, tomorrow) =>
   [
     sources.includes('merora') && { id: 'reminders-count', icon: 'bell', tone: 'blue', title: tr('reminders') },
     sources.includes('calendar') && { id: 'calendar-count', icon: 'calendar', tone: 'blue', title: tr('calendar') },
-    sources.includes('gmail') && { id: 'mails', icon: 'mail', tone: 'blue', title: tr(tomorrow ? 'mailsTomorrow' : 'unreadMails') },
+    sources.some(isMail) && { id: 'mails', icon: 'mail', tone: 'blue', title: tr(tomorrow ? 'mailsTomorrow' : 'unreadMails') },
   ].filter(Boolean);
 
 // previous: poslední uložené shrnutí dneška, podle něj je vidět, které zdroje a dlaždice člověk má.
 export function pendingDay(previous, now, { tomorrow = false } = {}) {
   // Doplňky (Merora DEV) jsou jen o dnešku a noci.
-  const sources = (previous.sources ?? ['merora', 'calendar', 'weather', 'gmail']).filter((id) => !tomorrow || ['merora', 'calendar', 'weather', 'gmail'].includes(id));
+  const core = ['merora', 'calendar', 'weather', ...MAIL_SOURCES];
+  const sources = (previous.sources ?? ['merora', 'calendar', 'weather', 'gmail']).filter((id) => !tomorrow || core.includes(id));
   const { salutation } = profile();
   const hello = tomorrow ? `${tr('tomorrowHere')}${salutation ? `, ${salutation}` : ''}.` : greeting(now, salutation);
-  const core = coreTiles(sources, tomorrow);
+  const mine = coreTiles(sources, tomorrow);
   // Pořadí dlaždic jako minule (dlaždice doplňků jsou mezi nimi), texty jádra v jazyce, který je nastavený teď.
-  const tiles = tomorrow || !previous.tiles?.length ? core : previous.tiles.map((d) => core.find((x) => x.id === d.id) ?? d);
+  const tiles = tomorrow || !previous.tiles?.length ? mine : previous.tiles.map((d) => mine.find((x) => x.id === d.id) ?? d);
   return {
     sample: false,
     createdAt: null,

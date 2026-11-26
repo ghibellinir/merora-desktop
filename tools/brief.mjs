@@ -13,6 +13,7 @@ import { tr } from './i18n.mjs';
 import { timeOf, dateForScreen, weekdayName, daysAgo, greeting, dayOf, dateParts } from './time.mjs';
 import { BRIEF, BRIEF_TOMORROW, fromOldBrief } from './data.mjs';
 import { isForDay } from './pending.mjs';
+import { hasMail, importantMail as isImportant, inboxOf, isMail, MAILBOX_NAMES, mailCounts, MAIL_SOURCES } from './mail.mjs';
 import { load as loadReminders, prepareReminders } from './sources/merora.mjs';
 import { directAvailable } from './merora.mjs';
 import { BRIEF_LENGTHS, getBriefLength, meroraLive, loadSettings, rulesForModel, profile, shouldMentionRings, shouldMentionWeather, forms, language } from './settings.mjs';
@@ -75,7 +76,7 @@ Výběr:
 - meta nejvýš ${MAX_META} znaků, doplňuje název: u místa např. „až dorazíš do obchodu“, u opakovaných „každý den“, u připomínky po termínu „zazvonilo 3×“, jen když je rang v datech. Čas se ukáže sám, do meta ho nepiš. Může být prázdná.
 - icon: phone (volání), clapper (natáčení), calendar (schůzka, hovor v kalendáři), basket (nákup), repeat (rutina a opakované), place (připomínka na místo), bell (ostatní).
 
-Maily („mails“): v datech je, kolik je nepřečtených (jen Doručená pošta bez reklam, sociálních sítí a newsletterů), a ty důležité. Do panelu dej všechny důležité, nejvýš ${MAX_PANEL_MAILS}, přednost mají ty, co spěchají, a od testerů. source je přesně id z dat. subject je předmět mailu česky a zkráceně, nejvýš ${MAX_SUBJECT} znaků, bez jmen lidí, adres a čísel. Jen to, co stojí v předmětu a about, nic nepřidávej a nedomýšlej. Když žádný důležitý není, vrať prázdný seznam. V monologu řekni, kolik nepřečtených mailů má, a vypíchni, co z nich spěchá nebo je důležité, nejvýš dvěma větami a bez jmen lidí. I tady jen to, co stojí v subject a about, nic si nedomýšlej. Ostatní nevyjmenovávej, na ty se může zeptat. Když nepřečtené nejsou, maily klidně vynech.
+Maily („mails“): v datech je, kolik je nepřečtených (jen Doručená pošta bez reklam, sociálních sítí a newsletterů), a ty důležité. Do panelu dej všechny důležité, nejvýš ${MAX_PANEL_MAILS}, přednost mají ty, co spěchají, a od testerů. source je přesně id z dat. subject je předmět mailu česky a zkráceně, nejvýš ${MAX_SUBJECT} znaků, bez jmen lidí, adres a čísel. Jen to, co stojí v předmětu a about, nic nepřidávej a nedomýšlej. Když žádný důležitý není, vrať prázdný seznam. V monologu řekni, kolik nepřečtených mailů má, a vypíchni, co z nich spěchá nebo je důležité, nejvýš dvěma větami a bez jmen lidí. I tady jen to, co stojí v subject a about, nic si nedomýšlej. Ostatní nevyjmenovávej, na ty se může zeptat. Když nepřečtené nejsou, maily klidně vynech. Když je v datech místo unread received_lately, nevíme, co z nich je přečtené: mluv o nových mailech za poslední dva dny, nikdy o nepřečtených.
 
 Monolog („sentences“):
 - ${d.sentences} podle toho, kolik toho je, každá nejvýš ${MAX_SENTENCE} znaků, celkem nejvýš ${d.total} znaků. Pozdrav nepiš, přidá ho systém. Když na dnešek s časem nic nemá, řekni to jednou větou.${
@@ -144,7 +145,7 @@ Lines ("today"):
 - meta at most ${MAX_META} characters, adds to the title: for a place e.g. "when you get to the shop", for repeating ones "every day", for an overdue reminder "rang 3×", only if rang is in the data. The time shows by itself, do not put it in meta. May be empty.
 - icon: phone (calls), clapper (filming), calendar (meeting, call in the calendar), basket (shopping), repeat (routine and repeating), place (place reminder), bell (other).
 
-Emails ("mails"): the data has how many are unread (only the inbox without ads, social networks and newsletters) and the important ones. Put all important ones in the panel, at most ${MAX_PANEL_MAILS}, urgent ones and ones from testers first. source is exactly the id from the data. subject is the email's subject in English and shortened, at most ${MAX_SUBJECT} characters, without people's names, addresses and numbers. Only what is in the subject and about, add nothing and assume nothing. If none is important, return an empty list. In the monologue say how many unread emails there are and point out what is urgent or important, in at most two sentences and without people's names. Here too only what is in subject and about, assume nothing. Do not list the others, the user can ask about them. If there are no unread emails, you can leave emails out.
+Emails ("mails"): the data has how many are unread (only the inbox without ads, social networks and newsletters) and the important ones. Put all important ones in the panel, at most ${MAX_PANEL_MAILS}, urgent ones and ones from testers first. source is exactly the id from the data. subject is the email's subject in English and shortened, at most ${MAX_SUBJECT} characters, without people's names, addresses and numbers. Only what is in the subject and about, add nothing and assume nothing. If none is important, return an empty list. In the monologue say how many unread emails there are and point out what is urgent or important, in at most two sentences and without people's names. Here too only what is in subject and about, assume nothing. Do not list the others, the user can ask about them. If there are no unread emails, you can leave emails out. When the data has received_lately instead of unread, we do not know which are read: talk about new emails from the last two days, never about unread ones.
 
 Monologue ("sentences"):
 - 2 to ${d.maxSentences} sentences depending on how much there is, each at most ${MAX_SENTENCE} characters, at most ${d.total} characters in total. Do not write a greeting, the system adds it. If nothing is timed for today, say so in one sentence.${
@@ -219,8 +220,7 @@ const textsSchema = (addons) => ({
 });
 
 // --- Složení shrnutí ---
-// Důležitý mail: spěchá, píše tester, nebo ho za důležitý označil zdroj Gmail (od člověka, termín, něco udělat).
-const isImportant = (m) => m.important || m.urgent || m.tester;
+// Důležitý mail (isImportant, tools/mail.mjs): spěchá, píše tester, nebo ho za důležitý označila schránka (od člověka, termín, něco udělat).
 
 const hash = (text) => createHash('sha1').update(text).digest('hex').slice(0, 10);
 // Stejný text bez ohledu na velká písmena, diakritiku a mezery („Porada v práci“ = „porada v praci“).
@@ -301,8 +301,13 @@ export function mailBoxes(inbox, chosen, now, { tomorrow = false } = {}) {
   const day = dayOf(now);
   const belongs = (m) => (tomorrow ? m.deadline === day : isImportant(m));
   const sources = new Map(inbox.mails.map((m) => [m.id, m]));
-  const panelMail = (z, subject) =>
-    tomorrow ? { subject, who: z.who, label: tr('tomorrowLabel'), tone: 'blue' } : { subject, who: z.who, label: tr(z.urgent ? 'urgent' : 'canWait'), tone: z.urgent ? 'fired' : 'grey' };
+  // src: ze které schránky (vypnutá z okna zmizí hned, tools/sources/index.mjs).
+  const panelMail = (z, subject) => ({
+    subject,
+    who: z.who,
+    ...(tomorrow ? { label: tr('tomorrowLabel'), tone: 'blue' } : { label: tr(z.urgent ? 'urgent' : 'canWait'), tone: z.urgent ? 'fired' : 'grey' }),
+    ...(z.src ? { src: z.src } : {}),
+  });
   const picked = chosen.slice(0, MAX_PANEL_MAILS).filter((r) => {
     const z = sources.get(r.source);
     if (!z) throw new Error(`mail „${r.source}“ nemá zdroj v datech`);
@@ -331,9 +336,10 @@ export function mailBoxes(inbox, chosen, now, { tomorrow = false } = {}) {
       id: 'mails',
       icon: 'mail',
       tone: 'blue',
-      title: tr('unreadMails'),
+      // Schránka, u které nejde poznat přečtené (Outlook přes konektor): nejsou to „nepřečtené“.
+      title: tr(inbox.unreadKnown === false ? 'recentMails' : 'unreadMails'),
       value: inbox.more ? `${inbox.count}+` : String(inbox.count),
-      caption: !inbox.count ? tr('nothingNew') : urgentCount ? tr('urgentCount', { count: urgentCount }) : count ? tr('importantCount', { count }) : tr('nothingImportant'),
+      caption: inbox.missing?.length && !urgentCount ? tr('mailboxMissing', { name: MAILBOX_NAMES[inbox.missing[0]] }) : !inbox.count ? tr('nothingNew') : urgentCount ? tr('urgentCount', { count: urgentCount }) : count ? tr('importantCount', { count }) : tr(inbox.unreadKnown === false ? 'lastTwoDays' : 'nothingImportant'),
       ...(urgentCount ? { captionTone: 'fired' } : {}),
     },
     mails,
@@ -381,8 +387,8 @@ export function composeBrief(texts, sourceData, now, { tomorrow = false } = {}) 
   // Dnešní s časem podle času, pak řádky doplňků, pak ostatní na volné místo.
   const today = sortLines(lines);
 
-  const inbox = sourceData.gmail; // { pocet, vic, maily }, null když se nenačetl
-  const mailBox = has('gmail') ? mailBoxes(inbox, texts.mails ?? [], now, { tomorrow }) : null;
+  const inbox = inboxOf(sourceData); // { count, more, mails } ze všech schránek, null když se žádná nenačetla
+  const mailBox = hasMail(sourceData) ? mailBoxes(inbox, texts.mails ?? [], now, { tomorrow }) : null;
 
   // Dlaždice podle pořadí doplňků, maily mají 20 (chyby 10 před nimi, uživatelé 30 za nimi).
   const tiles = [
@@ -436,8 +442,10 @@ export function composeBrief(texts, sourceData, now, { tomorrow = false } = {}) 
           inbox: {
             count: inbox.count,
             more: inbox.more,
-            mails: inbox.mails.map(({ subject, from, about, when, kind, important, urgent, tester, deadline }) => ({ subject, from, about, when, kind, important, urgent, tester, deadline: deadline ?? null })),
+            ...(inbox.unreadKnown === false ? { unreadKnown: false } : {}),
+            mails: inbox.mails.map(({ subject, from, about, when, kind, important, urgent, tester, deadline, src }) => ({ subject, from, about, when, kind, important, urgent, tester, deadline: deadline ?? null, ...(src ? { src } : {}) })),
           },
+          mailCounts: mailCounts(sourceData),
         }
       : {}),
     sentences,
@@ -570,13 +578,15 @@ export async function writeBrief(sourceData, now, { tomorrow = false } = {}) {
   if ('merora' in sourceData) input.reminders = loaded('merora', (r) => r.map(forModel));
   if ('calendar' in sourceData) input.calendar = loaded('calendar', (k) => k.map(forModel));
   if (pages.size) input.box_pages = Math.max(...pages.values());
-  if ('gmail' in sourceData) {
-    input.mails = loaded('gmail', (inbox) => {
+  if (hasMail(sourceData)) {
+    const box = inboxOf(sourceData);
+    const mails = (inbox) => {
       // Zítra: jen maily s termínem nebo událostí na zítřek, počet nepřečtených ne.
       if (tomorrow) return { importantMails: inbox.mails.filter((m) => m.deadline === dayOf(now)).map((m) => ({ id: m.id, subject: m.subject, about: m.about, from: m.kind === 'person' ? (m.tester ? 'tester' : 'člověk') : m.from, deadline: language() === 'en' ? 'tomorrow' : 'zítra' })) };
       const others = inbox.mails.filter((m) => !isImportant(m));
       return {
-        unread: inbox.more ? `víc než ${inbox.count}` : inbox.count,
+        ...(inbox.missing?.length ? { not_loaded: inbox.missing.map((id) => MAILBOX_NAMES[id]) } : {}),
+        [inbox.unreadKnown === false ? 'received_lately' : 'unread']: inbox.more ? `víc než ${inbox.count}` : inbox.count,
         // Od lidí jde dál jen „člověk“ nebo „tester“, jméno do shrnutí nepatří. Firmu říct může.
         importantMails: inbox.mails.filter(isImportant).map((m) => ({
           id: m.id,
@@ -592,7 +602,8 @@ export async function writeBrief(sourceData, now, { tomorrow = false } = {}) {
           newsletters_and_ads: others.filter((m) => m.kind !== 'person' && m.kind !== 'notification').length,
         },
       };
-    });
+    };
+    input.mails = box === null ? 'nepodařilo se načíst' : mails(box);
   }
   // Počasí jen se zapnutou volbou „Mluvit o počasí“ (karta na obrazovce zůstává vždycky).
   if ('weather' in sourceData && shouldMentionWeather()) input.weather = sourceData.weather ?? 'nepodařilo se načíst';
@@ -674,11 +685,13 @@ export async function collectTomorrow(start) {
   }
   Object.assign(sourceData, await collectOnly(['calendar', 'weather'].filter((id) => enabled.has(id)), start));
   if ('weather' in sourceData) sourceData.weather = weatherTomorrow(sourceData.weather);
-  if (enabled.has('gmail') && existsSync(BRIEF)) {
+  if (MAIL_SOURCES.some((id) => enabled.has(id)) && existsSync(BRIEF)) {
     const brief = fromOldBrief(JSON.parse(readFileSync(BRIEF, 'utf8')));
     // Jen maily z dnešního načtení. Z včerejšího shrnutí by na zítřek tvrdily, co už neplatí.
-    const gmail = isForDay(brief, dayOf(new Date())) ? brief.sourceData?.gmail : undefined;
-    if (gmail !== undefined) sourceData.gmail = gmail;
+    for (const id of MAIL_SOURCES.filter((x) => enabled.has(x))) {
+      const inbox = isForDay(brief, dayOf(new Date())) ? brief.sourceData?.[id] : undefined;
+      if (inbox !== undefined) sourceData[id] = inbox;
+    }
   }
   if (!Object.keys(sourceData).length) throw new Error(tr('nothingConnected'));
   return sourceData;
@@ -703,7 +716,7 @@ async function savedData(now) {
 // Sběr pouštěný serverem (IPC): maily pošle hned, jak jsou, a server přepíše jejich dlaždici a vypne u ní kolečko
 // (Riccardo 23. 11.: maily „se načítají 30–50 s“, kolečko čekalo i na věty od Clauda).
 const tellServer = (id, data) => {
-  if (id === 'gmail' && process.send) process.send({ source: id, data });
+  if (isMail(id) && process.send) process.send({ source: id, data });
 };
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -724,7 +737,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
           if (v === null) return `${id} nedostupné`;
           if (Array.isArray(v)) return `${id} ${v.length}`;
           if (id === 'weather') return `${id} ${v.temperature} °C`;
-          if (id === 'gmail') return `${id} ${v.count}${v.more ? '+' : ''} nepřečtených`;
+          if (isMail(id)) return `${id} ${v.count}${v.more ? '+' : ''} ${v.unreadKnown === false ? 'nových' : 'nepřečtených'}`;
           return `${id} ${v}`;
         })
         .join(', ')}`,
