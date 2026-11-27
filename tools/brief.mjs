@@ -310,7 +310,7 @@ export function mailBoxes(inbox, chosen, now, { tomorrow = false } = {}) {
   });
   const picked = chosen.slice(0, MAX_PANEL_MAILS).filter((r) => {
     const z = sources.get(r.source);
-    if (!z) throw new Error(`mail „${r.source}“ nemá zdroj v datech`);
+    if (!z) throw new Error(tr('mailWithoutSource', { source: r.source }));
     return belongs(z);
   });
   const mails = picked.map((r) => panelMail(sources.get(r.source), r.subject));
@@ -355,7 +355,7 @@ export function composeBrief(texts, sourceData, now, { tomorrow = false } = {}) 
 
   const lines = texts.today.map((r) => {
     const z = sources.get(r.source);
-    if (!z) throw new Error(`řádek „${r.title}“ nemá zdroj v datech`);
+    if (!z) throw new Error(tr('rowWithoutSource', { title: r.title }));
     return {
       id: r.source, icon: r.icon, tone: z.tone, title: r.title, time: z.time ?? undefined,
       ...(z.allDay ? { allDay: true } : {}), ...(z.kind === 'overdue' ? { overdue: true } : {}), meta: r.meta,
@@ -637,11 +637,15 @@ export async function writeBrief(sourceData, now, { tomorrow = false } = {}) {
       errors = [err.message];
       forMeri = errors;
     }
-    if (attempt === 2) throw new Error(`Shrnutí neprošlo kontrolou: ${errors.join('; ')}.`);
+    if (attempt === 2) {
+      // Podrobnosti jsou česky a pro model, do okna jde jen hláška v jazyce uživatele.
+      console.error(`Shrnutí neprošlo kontrolou: ${errors.join('; ')}.`);
+      throw new Error(tr('briefCheckFailed'));
+    }
     console.log(`Návrh neprošel kontrolou (${errors.join('; ')}), píše se znovu.`);
     rebuke = `\n\nMinulý návrh neprošel kontrolou, oprav to: ${forMeri.join('; ')}.`;
   }
-  throw new Error('Shrnutí se nepovedlo napsat.');
+  throw new Error(tr('briefNotWritten'));
 }
 
 // --- Zítřek (přepínač Dnes / Zítra) ---
@@ -702,11 +706,11 @@ export async function collectTomorrow(start) {
 // Zdroj, který se znovu nenačte, má data z minula.
 async function savedData(now) {
   const original = fromOldBrief(JSON.parse(readFileSync(BRIEF, 'utf8')));
-  if (!original.sourceData) throw new Error('Shrnutí nemá uložená data zdrojů, načti nová.');
-  if (!isForDay(original, dayOf(now))) throw new Error('Uložené shrnutí je z jiného dne, načti nová data.');
+  if (!original.sourceData) throw new Error(tr('briefNoSourceData'));
+  if (!isForDay(original, dayOf(now))) throw new Error(tr('briefOtherDay'));
   const enabledOnes = new Set(enabledSources().map((z) => z.id));
   const sourceData = Object.fromEntries(Object.entries(original.sourceData).filter(([id]) => enabledOnes.has(id)));
-  if (!Object.keys(sourceData).length) throw new Error('Žádný zapnutý zdroj nemá uložená data, načti nová.');
+  if (!Object.keys(sourceData).length) throw new Error(tr('briefNoEnabledData'));
   const again = [...SOURCES.filter((z) => z.noAI).map((z) => z.id), ...(directAvailable() && meroraLive() ? ['merora'] : [])];
   const fresh = await collectOnly(again.filter((id) => id in sourceData), now);
   for (const [id, data] of Object.entries(fresh)) if (data !== null) sourceData[id] = data;

@@ -855,7 +855,7 @@ function voiceVideo() {
   collection = true;
   makeVoice(currentVoice(), currentData())
     .then(() => afterPrepare(null))
-    .catch((err) => afterPrepare(`Hlas se nenamluvil: ${err.message}`));
+    .catch((err) => afterPrepare(tr('voiceNotRecorded', { error: err.message })));
 }
 
 // R, šipka vpravo nahoře nebo tlačítko v nastavení: posbírá znovu hned, i čerstvé. Co Meri zrovna říká, utne.
@@ -1214,7 +1214,7 @@ function isLocal(req) {
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 
 async function pickVoice(req, res) {
-  if (generatingVoice) return json(res, 409, { error: 'Hlas se zrovna generuje.' });
+  if (generatingVoice) return json(res, 409, { error: tr('voiceBusy') });
   const { voice_id, public_owner_id, name } = await readBody(req);
   if (!ID.test(voice_id ?? '') || !ID.test(public_owner_id ?? '')) return json(res, 400, { error: tr('invalidVoice') });
   generatingVoice = true;
@@ -1357,7 +1357,7 @@ async function api(req, res, pathname) {
     const { source } = await readBody(req);
     const z = SOURCES.find((x) => x.id === source && x.check);
     if (!z) {
-      json(res, 400, { error: 'Tenhle zdroj se nekontroluje.', ...settingsState() });
+      json(res, 400, { error: tr('sourceNotChecked'), ...settingsState() });
       return true;
     }
     const problem = await z.check({ read: true }).catch((err) => {

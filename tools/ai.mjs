@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { delimiter, join } from 'node:path';
+import { tr } from './i18n.mjs';
 
 const WORK_DIR = join(homedir(), '.meri'); // mimo repa, ať se nenačítají cizí instrukce
 
@@ -86,15 +87,15 @@ export class Conversation {
     this.waiting = null;
     clearTimeout(c.timer);
     if (result) c.finished(result);
-    else c.failed(new Error('Claude nevrátil výsledek.'));
+    else c.failed(new Error(tr('claudeNoResult')));
   }
 
   ask(text, limitMs = 45_000) {
     return new Promise((finished, failed) => {
-      if (!this.alive || this.waiting) return failed(new Error('Claude teď nemůže odpovědět.'));
+      if (!this.alive || this.waiting) return failed(new Error(tr('claudeBusy')));
       const timer = setTimeout(() => {
         this.waiting = null;
-        failed(new Error('Claude neodpověděl včas.'));
+        failed(new Error(tr('claudeTimeout')));
       }, limitMs);
       this.waiting = { finished, failed, timer };
       this.used = true;
@@ -133,14 +134,14 @@ export function askClaude({ prompt, schema, model, services = [], system, limitM
     let output = '';
     const timer = setTimeout(() => {
       p.kill();
-      failed(new Error('Claude neodpověděl včas.'));
+      failed(new Error(tr('claudeTimeout')));
     }, limitMs);
     p.stdout.on('data', (d) => {
       output += d;
     });
     p.on('error', (err) => {
       clearTimeout(timer);
-      failed(new Error(`Claude nejde spustit: ${err.message}`));
+      failed(new Error(tr('claudeCannotStart', { error: err.message })));
     });
     p.on('close', (code) => {
       clearTimeout(timer);
@@ -149,7 +150,7 @@ export function askClaude({ prompt, schema, model, services = [], system, limitM
         if (j.is_error || !j.structured_output) throw new Error('bez výsledku');
         finished(j.structured_output);
       } catch {
-        failed(new Error(`Claude nevrátil výsledek (kód ${code}).`));
+        failed(new Error(tr('claudeNoResultCode', { code })));
       }
     });
     p.stdin.end(prompt);
@@ -179,19 +180,19 @@ function loadConnectors(limitMs = 60_000) {
     let output = '';
     const timer = setTimeout(() => {
       p.kill();
-      failed(new Error('Claude neodpověděl včas.'));
+      failed(new Error(tr('claudeTimeout')));
     }, limitMs);
     p.stdout.on('data', (d) => {
       output += d;
     });
     p.on('error', (err) => {
       clearTimeout(timer);
-      failed(new Error(`Claude nejde spustit: ${err.message}`));
+      failed(new Error(tr('claudeCannotStart', { error: err.message })));
     });
     p.on('close', (code) => {
       clearTimeout(timer);
       // Prázdný výpis s chybou není „nic propojeného“ (nepropojený zdroj se jen vynechá).
-      if (code !== 0 && !output.trim()) return failed(new Error('Claude nevypsal konektory.'));
+      if (code !== 0 && !output.trim()) return failed(new Error(tr('claudeNoConnectors')));
       const connectors = [];
       for (const line of output.split(/\r?\n/)) {
         const m = line.match(/^(.+?): (\S+).* - (.+)$/);
@@ -225,7 +226,7 @@ export function withTool({ prompt, services, schema = null, model = 'haiku', max
     let output = null;
     const timer = setTimeout(() => {
       p.kill();
-      failed(new Error('Claude neodpověděl včas.'));
+      failed(new Error(tr('claudeTimeout')));
     }, limitMs);
     p.stdout.on('data', (d) => {
       pool += d;
@@ -256,7 +257,7 @@ export function withTool({ prompt, services, schema = null, model = 'haiku', max
     });
     p.on('error', (err) => {
       clearTimeout(timer);
-      failed(new Error(`Claude nejde spustit: ${err.message}`));
+      failed(new Error(tr('claudeCannotStart', { error: err.message })));
     });
     p.on('close', (code) => {
       clearTimeout(timer);
@@ -284,7 +285,7 @@ export async function callTool({ tool, extraArgs = {}, limitMs = 120_000 }) {
     limitMs,
   });
   const v = call[0];
-  if (!v) throw new Error(`Claude nástroj nezavolal (kód ${code}).`);
-  if (v.error) throw new Error(v.content || 'Nástroj vrátil chybu.');
+  if (!v) throw new Error(tr('claudeNoTool', { code }));
+  if (v.error) throw new Error(v.content || tr('toolError'));
   return callContent(v);
 }

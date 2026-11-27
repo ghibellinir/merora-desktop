@@ -8,6 +8,7 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const ENV = process.env.MERI_ENV || join(ROOT, '.env');
 const BASE = process.env.ELEVENLABS_BASE_URL || 'https://api.elevenlabs.io';
 import { language } from './settings.mjs';
+import { tr } from './i18n.mjs';
 
 const DEFAULT_MODEL = 'eleven_v4'; // podle dokumentace nejkvalitnější, umí česky
 
@@ -37,7 +38,7 @@ export function writeEnv(key, amount) {
 
 async function request(route, options = {}) {
   const key = loadEnv().ELEVENLABS_API_KEY;
-  if (!key) throw new Error('Chybí klíč ELEVENLABS_API_KEY v souboru .env.');
+  if (!key) throw new Error(tr('elevenNoKey'));
   const res = await fetch(BASE + route, {
     ...options,
     signal: AbortSignal.timeout(60_000),

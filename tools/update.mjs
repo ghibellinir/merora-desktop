@@ -12,6 +12,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tr } from './i18n.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const STATE = process.env.MERI_UPDATE_STATE || join(homedir(), '.meri', 'update.json');
@@ -94,7 +95,7 @@ export async function checkForUpdate({ force = false } = {}) {
         publishedAt: r.published_at ?? null,
       };
     } else if (res.status !== 404) {
-      throw new Error(`GitHub odpověděl ${res.status}`);
+      throw new Error(tr('githubStatus', { status: res.status }));
     }
     const state = { checkedAt: new Date().toISOString(), latest };
     writeState(state);
@@ -124,32 +125,32 @@ const hotkeyFiles = () => ['tools/hotkey.swift', 'tools/hotkey-windows.ps1'].map
 // Stáhne a nainstaluje nejnovější vydání. Vrátí novou verzi, nebo vyhodí chybu s větou pro okno.
 export async function applyUpdate() {
   const info = updateInfo();
-  if (!info) throw new Error('Máš nejnovější verzi.');
+  if (!info) throw new Error(tr('upToDate'));
   const { latest } = readState();
   const hotkeyBefore = hotkeyFiles();
   if (isGit()) {
-    if (ownChanges()) throw new Error('Ve složce máš vlastní úpravy. Aktualizuj ručně: git pull.');
+    if (ownChanges()) throw new Error(tr('ownChanges'));
     try {
       git(['fetch', '--tags', '--force', 'origin']);
       git(['merge', '--ff-only', `refs/tags/${latest.tag}`]);
     } catch (err) {
-      throw new Error(`Aktualizace přes git se nepovedla (${String(err.stderr || err.message).trim().split('\n')[0]}). Aktualizuj ručně: git pull.`);
+      throw new Error(tr('gitUpdateFailed', { error: String(err.stderr || err.message).trim().split('\n')[0] }));
     }
   } else {
-    if (!latest.tarball) throw new Error('Vydání nemá archiv ke stažení.');
+    if (!latest.tarball) throw new Error(tr('noArchive'));
     const dir = mkdtempSync(join(tmpdir(), 'merora-update-'));
     try {
       const res = await fetch(latest.tarball, { headers: HEADERS, redirect: 'follow', signal: AbortSignal.timeout(120_000) });
-      if (!res.ok) throw new Error(`stažení: ${res.status}`);
+      if (!res.ok) throw new Error(tr('downloadStatus', { status: res.status }));
       const archive = join(dir, 'release.tar.gz');
       writeFileSync(archive, Buffer.from(await res.arrayBuffer()));
       const unpacked = spawnSync('tar', ['-xzf', archive, '-C', dir], { windowsHide: true });
-      if (unpacked.status !== 0) throw new Error('rozbalení archivu');
+      if (unpacked.status !== 0) throw new Error(tr('unpackFailed'));
       const top = readdirSync(dir, { withFileTypes: true }).find((d) => d.isDirectory());
-      if (!top) throw new Error('archiv je prázdný');
+      if (!top) throw new Error(tr('archiveEmpty'));
       cpSync(join(dir, top.name), ROOT, { recursive: true, force: true });
     } catch (err) {
-      throw new Error(`Aktualizace se nepovedla (${err.message}). Zkus to později.`);
+      throw new Error(tr('updateFailed', { error: err.message }));
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

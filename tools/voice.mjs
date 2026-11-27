@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { currentData } from './data.mjs';
 import { PCM_HZ, speak, loadEnv, addVoice, usage } from './elevenlabs.mjs';
 import { language } from './settings.mjs';
+import { tr } from './i18n.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const OUT = join(ROOT, 'public', 'audio');
@@ -99,7 +100,7 @@ export function wavSeconds(file) {
     if (id === 'data') return size / byteRate;
     i += 8 + size + (size % 2);
   }
-  throw new Error(`Ve WAV chybí blok data: ${file}`);
+  throw new Error(tr('wavNoData', { file }));
 }
 
 // Jen hlas počítače na Macu (AIFF ze `say`). ElevenLabs jde přes pcmToWav.
@@ -145,7 +146,7 @@ function trimSilence(file, leadSec = 0.02, tailSec = 0.08) {
     if (id === 'data') pcm = b.subarray(i + 8, i + 8 + size);
     i += 8 + size + (size % 2);
   }
-  if (!pcm) throw new Error(`Ve WAV chybí blok data: ${file}`);
+  if (!pcm) throw new Error(tr('wavNoData', { file }));
 
   const samples = Math.floor(pcm.length / 2);
   const windowSize = Math.round(rate * 0.02);
@@ -237,7 +238,7 @@ export async function makeVoice(voiceId = currentVoice(), data = currentData()) 
     const duration = wavSeconds(fresh);
     if (duration < 0.2) {
       rmSync(fresh);
-      throw new Error(`Věta „${sentence.id}“ vyšla jen na ${duration.toFixed(3)} s, nahrávka je špatně.`);
+      throw new Error(tr('sentenceTooShort', { id: sentence.id, seconds: duration.toFixed(3) }));
     }
     renameSync(fresh, wav(sentence));
     texts[sentence.id] = text;

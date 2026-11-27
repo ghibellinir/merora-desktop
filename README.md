@@ -27,8 +27,8 @@ Všechno jde i později v nastavení (ozubené kolečko vpravo nahoře, ukáže 
 **Aktualizace:** Merora Desktop se jednou denně podívá na GitHub, jestli je nová verze. Když ano, nahoře v okně se ukáže **Nová verze … · Co je nového** a v nastavení v části O aplikaci co je nového a tlačítko **Aktualizovat**. To stáhne novou verzi (při instalaci přes git posune složku na nové vydání, jinak rozbalí archiv vydání) a Merora se sama restartuje, okno se načte znovu. Klíče, nastavení a data zůstávají. Kdo má ve složce vlastní úpravy, dostane jen upozornění, ať aktualizuje ručně (`git pull`).
 
 - **Merora:** v úvodu nebo v nastavení u Merory klikni na **Propojit s účtem Merora**. V prohlížeči se otevře stránka Merory s QR kódem, naskenuješ ho telefonem a propojení potvrdíš v appce Merora. Stránka pak ukáže zelené **Propojeno** a můžeš ji zavřít, okno Merory to samo pozná a načte nová data. Merora Desktop najdeš v appce v Nastavení › Připojené aplikace, kde jde odpojit, a změny z počítače telefon dostane hned. Opačně taky: připomínka přidaná nebo smazaná v telefonu (nebo přes Clauda) se v okně ukáže hned, protože Merora dá Desktopu o každé změně vědět, a kdyby zpráva nedošla, nejpozději do minuty (volba Merora hned po změně v nastavení). Číst jde s každým účtem, měnit s Merora Pro.
-- **Gmail:** v Claudovi Nastavení › Konektory › Gmail. Meri v něm jen hledá a čte, nic nepošle, nesmaže ani neoznačí jako přečtené.
-- **Outlook:** na claude.ai v prohlížeči Nastavení › Konektory › Microsoft 365, přihlas se osobním (Outlook.com, Hotmail, Live) nebo pracovním účtem. Pak v Meroře v nastavení v části Propojení zapni Outlook a klikni na Zkontrolovat. Meri v něm jen hledá, mail neotvírá, nic nepošle ani nesmaže. Maily z Gmailu a Outlooku ukazuje dohromady.
+- **Gmail:** v Claudovi Customize › Connectors › Gmail. Meri v něm jen hledá a čte, nic nepošle, nesmaže ani neoznačí jako přečtené.
+- **Outlook:** na claude.ai v prohlížeči Customize › Connectors › Microsoft 365, přihlas se osobním (Outlook.com, Hotmail, Live) nebo pracovním účtem. Pak v Meroře v nastavení v části Propojení zapni Outlook a klikni na Zkontrolovat. Meri v něm jen hledá, mail neotvírá, nic nepošle ani nesmaže. Maily z Gmailu a Outlooku ukazuje dohromady.
 - **Jiný mailový účet:** účet se vybírá v Claudovi. U konektoru ho odpoj a připoj znovu s jiným, v Meroře pak zmáčkni R.
 - **Kalendář:** Google, Apple, Outlook a každý další, který umí odkaz ve formátu iCal. Postup je níž v části [Kalendář](#kalendář).
 - **Počasí:** stačí město v úvodu nebo v nastavení. Bez města se počasí neukazuje a Meri o něm nemluví.
@@ -108,7 +108,7 @@ Když tě uživatel požádá o instalaci Merora Desktop:
 1. Zjisti systém a zkontroluj `node --version` (potřeba je 20 nebo novější). Když Node chybí, nainstaluj ho: Mac `brew install node` (bez Homebrew mu dej odkaz na instalátor z nodejs.org), Windows `winget install OpenJS.NodeJS.LTS`. Zkontroluj, že má Google Chrome.
 2. Stáhni repo do jeho domovské složky: `git clone https://github.com/ghibellinir/merora-desktop ~/merora-desktop`. Bez gitu stáhni a rozbal `https://github.com/ghibellinir/merora-desktop/archive/refs/heads/main.zip`.
 3. Ve složce merora-desktop spusť `npm run setup` a počkej, až otevře Chrome.
-4. Řekni mu, ať v Chromu projde úvod. Meroru propojí v úvodu tlačítkem Propojit s účtem Merora (QR kód, potvrzení v telefonu), Gmail v Claudovi (Nastavení › Konektory), kalendář a klíč ElevenLabs vloží sám v úvodu. Klíče, hesla a odkazy nikam neopisuj, nevkládej je za něj a nevypisuj je.
+4. Řekni mu, ať v Chromu projde úvod. Meroru propojí v úvodu tlačítkem Propojit s účtem Merora (QR kód, potvrzení v telefonu), Gmail v Claudovi (Customize › Connectors), kalendář a klíč ElevenLabs vloží sám v úvodu. Klíče, hesla a odkazy nikam neopisuj, nevkládej je za něj a nevypisuj je.
 5. Když instalace hlásí chybu, přečti `~/.meri/server.log` a oprav jen to, co se týká instalace.
 
 ## Pro vývojáře

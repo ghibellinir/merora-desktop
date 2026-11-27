@@ -179,7 +179,7 @@ export const realtimeConfig = () => ({ supabaseUrl: settings().supabase, apikey:
 export async function realtimeAuth() {
   const token = await accessToken();
   const content = JSON.parse(Buffer.from(String(token).split('.')[1] ?? '', 'base64url').toString('utf8') || '{}');
-  if (typeof content.sub !== 'string' || !content.sub) throw new Error('token nemá id účtu');
+  if (typeof content.sub !== 'string' || !content.sub) throw new Error(tr('tokenNoAccount'));
   return { token, userId: content.sub };
 }
 

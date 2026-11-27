@@ -52,7 +52,10 @@ export function loadSettings() {
     const n = fromOldSettings(JSON.parse(readFileSync(SETTINGS, 'utf8')));
     return { ...n, sources: n.sources ?? {} };
   } catch {
-    throw new Error(`Nastavení ${SETTINGS} nejde přečíst. Oprav ho, nebo ho smaž a platí výchozí.`);
+    // Jazyk je v tomhle souboru, takže nejde poznat: hláška je v obou.
+    throw new Error(
+      `Nastavení ${SETTINGS} nejde přečíst. Oprav ho, nebo ho smaž a platí výchozí. / The settings file cannot be read. Fix it, or delete it to use the defaults.`,
+    );
   }
 }
 

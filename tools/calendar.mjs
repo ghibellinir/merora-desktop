@@ -4,6 +4,7 @@ import { loadEnv } from './elevenlabs.mjs';
 
 import { ZONE } from './time.mjs'; // časové pásmo počítače
 import { ianaZone } from './zones.mjs';
+import { tr } from './i18n.mjs';
 const DAY_MS = 86_400_000;
 const WEEKDAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 
@@ -207,9 +208,9 @@ function download(link) {
     try {
       res = await fetch(link, { signal: AbortSignal.timeout(30_000) });
     } catch {
-      throw new Error('Kalendář se nepodařilo stáhnout.');
+      throw new Error(tr('calendarDownloadFailed'));
     }
-    if (!res.ok) throw new Error(`Kalendář vrátil chybu ${res.status}.`);
+    if (!res.ok) throw new Error(tr('calendarError', { status: res.status }));
     return res.text();
   })();
   lastIcs = { link, when: Date.now(), work };

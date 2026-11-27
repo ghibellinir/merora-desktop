@@ -37,7 +37,7 @@ export async function weather() {
     forecast_days: '2',
   });
   const res = await fetch(`${BASE}/v1/forecast?${q}`, { signal: AbortSignal.timeout(15_000) });
-  if (!res.ok) throw new Error(`Počasí vrátilo chybu ${res.status}.`);
+  if (!res.ok) throw new Error(tr('weatherError', { status: res.status }));
   const { current, daily } = await res.json();
   return {
     temperature: Math.round(current.temperature_2m),
@@ -66,7 +66,7 @@ export async function findCity(task) {
   const base = process.env.MERI_GEO_URL || 'https://geocoding-api.open-meteo.com';
   const q = new URLSearchParams({ name: title, count: '10', language: language(), format: 'json' });
   const res = await fetch(`${base}/v1/search?${q}`, { signal: AbortSignal.timeout(10_000) });
-  if (!res.ok) throw new Error(`Hledání města vrátilo chybu ${res.status}.`);
+  if (!res.ok) throw new Error(tr('citySearchError', { status: res.status }));
   const results = (await res.json()).results ?? [];
   // „Mělník“ vrátí nejdřív bulharský Melnik (250 obyvatel). Přednost má přesné jméno i s háčky,
   // Česko a Slovensko a větší místo (bez háčků napsaný „Melnik“ tak najde taky Mělník).
